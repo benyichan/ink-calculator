@@ -303,6 +303,42 @@
   .modal-actions button.primary{background:var(--eq-bg);color:var(--eq-ink);border-color:transparent;}
   .modal-actions button.danger{color:var(--danger);}
 
+  /* ---------- 千分位速读帮助 ---------- */
+  .help-modal .modal-card{max-width:560px;max-height:84vh;padding:0;overflow:hidden;}
+  .help-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 20px 14px;border-bottom:1px solid var(--line);}
+  .help-kicker{font-size:10px;letter-spacing:1.2px;font-weight:700;color:var(--ink-soft);margin-bottom:5px;}
+  .help-close{
+    flex-shrink:0;width:30px;height:30px;border-radius:8px;border:1px solid var(--line);
+    background:var(--fn-bg);color:var(--ink);font-size:18px;line-height:1;cursor:pointer;
+  }
+  .help-scroll{overflow-y:auto;padding:16px 20px 6px;display:flex;flex-direction:column;gap:18px;}
+  .help-scroll::-webkit-scrollbar{width:5px;}
+  .help-scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px;}
+  .help-sec{display:flex;flex-direction:column;gap:8px;}
+  .help-h{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:700;color:var(--ink);}
+  .help-h span{font-size:11px;font-weight:700;color:var(--eq-ink);background:var(--eq-bg);border-radius:5px;padding:2px 6px;}
+  .help-p{font-size:12.5px;line-height:1.7;color:var(--ink-soft);}
+  .help-p b{color:var(--ink);}
+  .unit-flow{
+    font-family:var(--font-num);font-variant-numeric:tabular-nums;font-size:12px;line-height:1.9;
+    padding:10px 12px;border:1px solid var(--line);border-radius:8px;
+    background:var(--fn-bg);color:var(--ink);
+  }
+  .help-examples{display:flex;flex-direction:column;gap:8px;}
+  .help-ex{padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--display-bg);display:flex;flex-direction:column;gap:2px;}
+  .help-num{font-family:var(--font-num);font-variant-numeric:tabular-nums;font-size:13px;font-weight:700;color:var(--ink);}
+  .help-read{font-size:12px;line-height:1.6;color:var(--ink-soft);}
+  .help-table{width:100%;border-collapse:collapse;font-size:12px;}
+  .help-table th,.help-table td{border:1px solid var(--line);padding:6px 9px;text-align:left;}
+  .help-table th{width:74px;background:var(--fn-bg);color:var(--ink-soft);font-weight:600;white-space:nowrap;}
+  .help-table td{font-family:var(--font-num);color:var(--ink);}
+  .help-code{
+    font-family:var(--font-mono);font-size:11px;line-height:1.6;word-break:break-all;
+    padding:10px 12px;border:1px solid var(--line);border-radius:8px;
+    background:var(--display-bg);color:var(--ink);
+  }
+  .help-modal .modal-actions{padding:12px 20px 18px;}
+
   @media (max-width:480px){
     #expr{font-size:38px;}
   }
@@ -337,6 +373,9 @@
       <button class="icon-btn" id="themeBtn" title="切换主题" aria-label="切换主题">
         <svg id="themeSun" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4" fill="currentColor"/><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
         <svg id="themeMoon" class="hidden" viewBox="0 0 24 24" fill="none"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" fill="currentColor"/></svg>
+      </button>
+      <button class="icon-btn" id="helpBtn" title="千分位速读练习" aria-label="千分位速读练习">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.2 1-1.2 1.9v.4"/><circle cx="12" cy="17.2" r="1.05" fill="currentColor" stroke="none"/></svg>
       </button>
       <button class="icon-btn" id="historyBtn" title="计算历史" aria-label="计算历史">
         <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -470,6 +509,59 @@
     <div class="modal-actions">
       <button id="settingsClose">取消</button>
       <button class="primary" id="settingsSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal help-modal" id="helpModal">
+  <div class="modal-card">
+    <div class="help-head">
+      <div>
+        <div class="help-kicker">QUICK READ  /  千分位速读</div>
+        <div class="modal-title">通过千分位，快速读出金额</div>
+      </div>
+      <button class="help-close" id="helpClose" aria-label="关闭">×</button>
+    </div>
+    <div class="help-scroll">
+      <section class="help-sec">
+        <div class="help-h"><span>01</span>先熟悉单位的顺序</div>
+        <div class="unit-flow">个 · 十 · 百 · 千 · 万 · 十万 · 百万 · 千万 · 亿 · 十亿 · 百亿 · 千亿 …</div>
+      </section>
+      <section class="help-sec">
+        <div class="help-h"><span>02</span>每三位加一个千分位符</div>
+        <div class="help-p">从右往左，每三位分一节。<b>每个逗号前一位</b>依次落在「千 / 百万 / 十亿 / 万亿…」，记住这几个锚点，读数会快很多。</div>
+        <div class="help-examples">
+          <div class="help-ex">
+            <div class="help-num">1,234.56</div>
+            <div class="help-read">壹仟贰佰叁拾肆元伍角陆分</div>
+          </div>
+          <div class="help-ex">
+            <div class="help-num">1,234,567.89</div>
+            <div class="help-read">壹佰贰拾叁万肆仟伍佰陆拾柒元捌角玖分</div>
+          </div>
+          <div class="help-ex">
+            <div class="help-num">1,234,567,891.01</div>
+            <div class="help-read">壹拾贰亿叁仟肆佰伍拾陆万柒仟捌佰玖拾壹元壹分</div>
+          </div>
+        </div>
+      </section>
+      <section class="help-sec">
+        <div class="help-h"><span>03</span>每一段三位，对应固定单位</div>
+        <table class="help-table">
+          <tr><th>第 1 段</th><td>个 · 十 · 百</td></tr>
+          <tr><th>第 2 段</th><td>十万 · 万 · 千</td></tr>
+          <tr><th>第 3 段</th><td>亿 · 千万 · 百万</td></tr>
+          <tr><th>第 4 段</th><td>千亿 · 百亿 · 十亿</td></tr>
+        </table>
+      </section>
+      <section class="help-sec">
+        <div class="help-h"><span>04</span>用 Excel 练手</div>
+        <div class="help-p">用随机函数生成不同位数的金额，把单元格设为<b>会计专用</b>，照着上面的规律慢慢读几遍，形成肌肉记忆。</div>
+        <div class="help-code">=ROUND(RANDBETWEEN(100,1000000)+RAND(),2)</div>
+      </section>
+    </div>
+    <div class="modal-actions">
+      <button class="primary" id="helpDone">知道了</button>
     </div>
   </div>
 </div>
@@ -1745,6 +1837,10 @@
       }
     }
   });
+
+  document.getElementById('helpBtn').addEventListener('click', function(){ openModal('helpModal'); });
+  document.getElementById('helpClose').addEventListener('click', function(){ closeModal('helpModal'); });
+  document.getElementById('helpDone').addEventListener('click', function(){ closeModal('helpModal'); });
 
   document.getElementById('themeBtn').addEventListener('click', function(){
     setTheme(state.theme === 'eink' ? 'dark' : 'eink');
