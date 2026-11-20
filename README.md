@@ -1,12 +1,26 @@
+<div align="center">
+
 # Ink Calculator · 墨水屏计算器
 
-一款自用的 Android 计算器 App：墨水屏（E-ink）视觉风格、可任意位置插入的数字/符号表达式、本地计算历史、显示单位换算。
+**把计算器做成一张纸。**
+
+[![GitHub Pages](https://img.shields.io/badge/落地页-GitHub%20Pages-20201e?style=flat-square)](https://benyichan.github.io/ink-calculator/)
+[![License: MIT](https://img.shields.io/badge/协议-MIT-20201e?style=flat-square)](LICENSE)
+[![Platform](https://img.shields.io/badge/平台-Android%207%2B-20201e?style=flat-square)](https://github.com/benyichan/ink-calculator/releases)
+
+[**🌐 产品介绍落地页**](https://benyichan.github.io/ink-calculator/) · [**📱 下载 APK v1.5**](apk/ink-calculator-v1.5.apk) · [**▶️ 浏览器在线体验**](https://benyichan.github.io/ink-calculator/app/index.html)
+
+![screenshot](assets/screenshot.png)
+
+</div>
+
+---
 
 > **缘起**：系统自带的计算器不能在输入框定位光标；好不容易找到符合要求的，打开有广告，想买会员国内又买不了。索性自己做一个——把想要的功能都加上，UI 也按自己喜欢的来。于是有了这个墨水屏计算器。
 
-单文件 HTML 界面 + Capacitor 打包，无后端、无网络请求、无广告，数据全部留在本机。
+完整的产品故事、设计理念、功能演示和「为谁而做」，都在 **[产品介绍落地页](https://benyichan.github.io/ink-calculator/)** —— README 这里只讲怎么拿去用、怎么构建。
 
-![screenshot](assets/screenshot.png)
+---
 
 ## 特性
 
@@ -18,15 +32,13 @@
 - **科学模式**：三角函数、对数、幂、开方、阶乘、DEG/RAD、记忆功能
 - **贴心细节**：超长公式自动缩字号完整显示、零过多自动科学计数法、CASIO 式上下文百分号（`100-12.5% = 87.5`）、长按公式复制到剪贴板
 
-## 下载
+## 下载与体验
 
-直接在 GitHub Releases 或 [apk/](apk/) 目录下载 `ink-calculator-v1.5.apk` 安装（Android 7.0 / API 24 及以上）。
-
-APK 使用自签名证书构建，首次安装需在系统设置中允许「安装未知来源应用」。
-
-## 在线体验
-
-不需要装 APK，也可以直接在浏览器里打开 [app/index.html](app/index.html)（单文件，零依赖，双击即用）。浏览器版与 APK 内的界面源码完全一致。
+| 方式 | 入口 | 说明 |
+|---|---|---|
+| 📱 Android APK | [apk/ink-calculator-v1.5.apk](apk/ink-calculator-v1.5.apk) · [Releases](https://github.com/benyichan/ink-calculator/releases) | 自签名 release，Android 7.0 / API 24+，首次安装需允许「未知来源」 |
+| ▶️ 浏览器版 | [在线打开](https://benyichan.github.io/ink-calculator/app/index.html) 或本地 [app/index.html](app/index.html) | 单文件、零依赖、离线可用，与 APK 界面源码完全一致 |
+| 🌐 产品介绍 | [落地页](https://benyichan.github.io/ink-calculator/) |缘起、设计理念、体验演示、为谁而做 |
 
 ## 构建
 
@@ -40,16 +52,20 @@ cd android
 # 产物：android/app/build/outputs/apk/release/app-release.apk
 ```
 
-要重新签名，请在 `android/app/` 下放置自己的 keystore，并修改 `android/app/build.gradle` 中的 `signingConfigs`。
+要重新签名：在 `android/app/` 放自己的 keystore，改 `android/app/build.gradle` 的 `signingConfigs`。
 
 ## 项目结构
 
 | 路径 | 说明 |
 |---|---|
+| `index.html` | **GitHub Pages 落地页**（产品介绍宣传页，站点根） |
 | `app/index.html` | 计算器完整源码（单文件 HTML：样式 + 解析引擎 + 界面） |
 | `apk/` | 已签名的 release APK |
-| `assets/` | 图标与真机截图 |
-| `index.html` | 本仓库的 GitHub Pages 落地页 |
+| `assets/` | 图标、OG 分享图、真机截图（落地页与 README 共用） |
+| `robots.txt` / `sitemap.xml` / `llms.txt` | SEO / GEO 基建，随落地页发布 |
+| `.nojekyll` | 关闭 Jekyll，保证 Pages 原样发布静态文件 |
+
+> 落地页与 README 共用 `assets/`：改了截图或图标，两边同时生效。
 
 ## 技术说明
 
