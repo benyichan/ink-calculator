@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ink Calculator · 墨水屏计算器</title>
+<meta name="description" content="一款墨水屏风格的 Android 计算器：可光标级编辑表达式、本地计算历史、千/万/亿单位换算、智能括号与长按复制。单文件 HTML + Capacitor 打包，MIT 开源。">
+<link rel="canonical" href="https://benyichan.github.io/ink-calculator/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Ink Calculator · 墨水屏计算器">
+<meta property="og:description" content="纸感、细线、CASIO 式按键。一个把颜值做到极致的开源计算器 App。">
+<meta property="og:url" content="https://benyichan.github.io/ink-calculator/">
+<meta property="og:image" content="https://benyichan.github.io/ink-calculator/assets/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23e9e8e3'/%3E%3Crect x='16' y='8' width='32' height='48' rx='6' fill='none' stroke='%2320201e' stroke-width='3'/%3E%3Crect x='21' y='13' width='22' height='11' rx='2' fill='%23dcdad2' stroke='%237a7a72'/%3E%3Cpath d='M26 35h12M26 43h12' stroke='%2320201e' stroke-width='2'/%3E%3C/svg%3E">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "Ink Calculator",
+      "alternateName": "墨水屏计算器",
+      "applicationCategory": "UtilitiesApplication",
+      "operatingSystem": "Android 7.0+",
+      "description": "墨水屏风格的开源 Android 计算器，支持光标级表达式编辑、本地计算历史与显示单位换算。",
+      "license": "https://opensource.org/licenses/MIT",
+      "url": "https://benyichan.github.io/ink-calculator/",
+      "author": { "@type": "Person", "name": "Benyi Chan", "url": "https://github.com/benyichan" }
+    },
+    {
+      "@type": "WebSite",
+      "name": "Ink Calculator",
+      "url": "https://benyichan.github.io/ink-calculator/",
+      "inLanguage": "zh-CN"
+    }
+  ]
+}
+</script>
+<style>
+  :root{
+    --paper:#e9e8e3; --paper-2:#f4f3ec; --display:#e2e1da;
+    --ink:#20201e; --ink-soft:#6f6f66; --line:#bdbcb5;
+    --op:#5a5952; --accent:#3a3a34; --danger:#8a4a42;
+    --serif:Georgia,"Songti SC","Noto Serif CJK SC","SimSun",serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    --mono:"SF Mono",Consolas,"JetBrains Mono",monospace;
+    --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--paper);color:var(--ink);font-family:var(--sans);
+    line-height:1.7;-webkit-font-smoothing:antialiased;position:relative;
+  }
+  body::before{
+    content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+    background-image:var(--grain);opacity:.045;mix-blend-mode:multiply;
+  }
+  .wrap{max-width:1120px;margin:0 auto;padding:0 28px;position:relative;z-index:1;}
+
+  /* ---- header ---- */
+  header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:26px 0 22px;border-bottom:1px solid var(--line);
+  }
+  .brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--ink);}
+  .brand-icon{
+    width:38px;height:46px;border:2px solid var(--ink);border-radius:7px;
+    display:grid;place-items:center;font-family:var(--serif);font-size:20px;font-weight:700;
+    background:var(--paper-2);
+  }
+  .brand-name{font-family:var(--serif);font-size:20px;letter-spacing:.5px;}
+  .brand-sub{font-size:11px;color:var(--ink-soft);letter-spacing:1px;}
+  nav{display:flex;gap:26px;align-items:center;}
+  nav a{color:var(--ink-soft);text-decoration:none;font-size:13px;transition:color .15s;}
+  nav a:hover{color:var(--ink);}
+  .nav-cta{
+    padding:8px 16px;border:1px solid var(--ink);border-radius:6px;color:var(--ink) !important;
+    font-weight:600;
+  }
+  .nav-cta:hover{background:var(--ink);color:var(--paper-2) !important;}
+
+  /* ---- hero ---- */
+  .hero{display:grid;grid-template-columns:1fr 420px;gap:64px;align-items:center;padding:72px 0 80px;}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:2px;color:var(--ink-soft);margin-bottom:20px;}
+  .hero h1{font-family:var(--serif);font-size:58px;line-height:1.15;font-weight:700;letter-spacing:-1px;margin-bottom:22px;}
+  .hero h1 em{font-style:normal;border-bottom:3px solid var(--ink);padding-bottom:2px;}
+  .hero p.lead{font-size:17px;color:var(--ink-soft);max-width:480px;margin-bottom:32px;}
+  .hero-actions{display:flex;gap:14px;flex-wrap:wrap;}
+  .btn{
+    display:inline-flex;align-items:center;gap:8px;padding:13px 24px;border-radius:7px;
+    font-size:14px;font-weight:600;text-decoration:none;transition:transform .12s,filter .12s;
+    border:1px solid var(--ink);cursor:pointer;
+  }
+  .btn:hover{transform:translateY(-2px);}
+  .btn:active{transform:translateY(0);}
+  .btn-primary{background:var(--ink);color:var(--paper-2);}
+  .btn-ghost{background:transparent;color:var(--ink);}
+  .meta-row{display:flex;gap:22px;margin-top:34px;flex-wrap:wrap;}
+  .meta-item{font-size:12px;color:var(--ink-soft);}
+  .meta-item b{display:block;font-family:var(--mono);font-size:17px;color:var(--ink);font-weight:600;}
+
+  /* ---- phone ---- */
+  .phone{
+    width:360px;max-width:100%;margin:0 auto;background:var(--paper-2);
+    border:2px solid var(--ink);border-radius:34px;padding:10px;
+    box-shadow:12px 12px 0 var(--line);position:relative;
+  }
+  .phone-notch{
+    width:88px;height:12px;border:2px solid var(--ink);border-top:none;
+    border-radius:0 0 12px 12px;margin:0 auto 10px;background:var(--paper);
+  }
+  .phone img{width:100%;display:block;border-radius:22px;border:1px solid var(--line);}
+  .phone-cap{
+    text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:1px;
+    color:var(--ink-soft);margin-top:12px;
+  }
+
+  /* ---- sections ---- */
+  section{padding:78px 0;border-top:1px solid var(--line);}
+  .sec-head{margin-bottom:48px;}
+  .sec-kicker{font-family:var(--mono);font-size:11px;letter-spacing:2px;color:var(--ink-soft);margin-bottom:12px;}
+  .sec-head h2{font-family:var(--serif);font-size:36px;letter-spacing:-.5px;}
+  .sec-head p{color:var(--ink-soft);margin-top:10px;max-width:620px;}
+
+  .features{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
+  .card{
+    border:1px solid var(--line);border-radius:10px;padding:28px 26px 30px;
+    background:var(--paper-2);position:relative;transition:box-shadow .18s,transform .18s;
+  }
+  .card:hover{transform:translateY(-3px);box-shadow:5px 5px 0 var(--line);}
+  .card-num{font-family:var(--mono);font-size:11px;color:var(--ink-soft);letter-spacing:1px;}
+  .card h3{font-family:var(--serif);font-size:20px;margin:14px 0 10px;}
+  .card p{font-size:13.5px;color:var(--ink-soft);line-height:1.75;}
+
+  /* ---- formula strip ---- */
+  .strip{background:var(--ink);color:var(--paper-2);border-radius:12px;padding:44px 48px;}
+  .strip h3{font-family:var(--serif);font-size:28px;margin-bottom:8px;}
+  .strip p{color:#b9b8b0;font-size:14px;margin-bottom:28px;}
+  .lines{display:grid;grid-template-columns:repeat(2,1fr);gap:14px 48px;font-family:var(--mono);font-size:14px;}
+  .line{display:flex;justify-content:space-between;border-bottom:1px dashed #5a5952;padding:6px 0;}
+  .line b{color:#fff;font-weight:600;}
+
+  /* ---- download ---- */
+  .download{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+  .dl-box{border:1px solid var(--ink);border-radius:10px;padding:34px;background:var(--display);}
+  .dl-box h3{font-family:var(--serif);font-size:24px;margin-bottom:10px;}
+  .dl-box p{font-size:13px;color:var(--ink-soft);margin-bottom:24px;}
+  .dl-box .btn{width:100%;justify-content:center;}
+  .version{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-top:14px;text-align:center;}
+
+  footer{
+    border-top:1px solid var(--line);padding:38px 0 56px;
+    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;
+  }
+  footer .f-brand{font-family:var(--serif);font-size:15px;}
+  footer a{color:var(--ink-soft);text-decoration:none;font-size:13px;margin-left:20px;}
+  footer a:hover{color:var(--ink);}
+  .mit{font-family:var(--mono);font-size:11px;color:var(--ink-soft);}
+
+  @media (max-width:900px){
+    .hero{grid-template-columns:1fr;gap:48px;padding:52px 0 60px;}
+    .hero h1{font-size:44px;}
+    .features{grid-template-columns:repeat(2,1fr);}
+    .phone{margin-top:10px;}
+  }
+  @media (max-width:620px){
+    .wrap{padding:0 20px;}
+    nav a:not(.nav-cta){display:none;}
+    .hero h1{font-size:36px;}
+    .features{grid-template-columns:1fr;}
+    .download{grid-template-columns:1fr;}
+    .lines{grid-template-columns:1fr;}
+    .strip{padding:32px 26px;}
+    section{padding:56px 0;}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <a class="brand" href="#top">
+      <span class="brand-icon">(=)</span>
+      <span>
+        <span class="brand-name">Ink Calculator</span><br>
+        <span class="brand-sub">墨水屏计算器</span>
+      </span>
+    </a>
+    <nav>
+      <a href="#features">特性</a>
+      <a href="#engine">引擎</a>
+      <a href="#download">下载</a>
+      <a class="nav-cta" href="https://github.com/benyichan/ink-calculator" target="_blank" rel="noopener">GitHub ↗</a>
+    </nav>
+  </header>
+</div>
+
+<div class="wrap" id="top">
+  <div class="hero">
+    <div>
+      <div class="eyebrow">OPEN SOURCE · ANDROID · MIT</div>
+      <h1>把计算器<br>做成一张<em>纸</em>。</h1>
+      <p class="lead">纸色、细线、CASIO 式按键。没有花哨的渐变，只有墨水屏般的克制质感——和一个真正好用的表达式引擎。</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="apk/ink-calculator-v1.5.apk">↓ 下载 APK</a>
+        <a class="btn btn-ghost" href="app/index.html" target="_blank">在线体验 ↗</a>
+      </div>
+      <div class="meta-row">
+        <div class="meta-item"><b>3.1 MB</b>安装包</div>
+        <div class="meta-item"><b>Android 7+</b>系统要求</div>
+        <div class="meta-item"><b>零外呼</b>隐私本地</div>
+        <div class="meta-item"><b>MIT</b>开源协议</div>
+      </div>
+    </div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <img src="assets/screenshot.png" alt="墨水屏计算器界面截图">
+      <div class="phone-cap">E-INK · SIMPLE MODE</div>
+    </div>
+  </div>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-kicker">01 / FEATURES</div>
+      <h2>好看，也好用</h2>
+      <p>每一个细节都为「自用」打磨——从光标的位置到括号的判断，都不将就。</p>
+    </div>
+    <div class="features">
+      <div class="card">
+        <div class="card-num">01 —</div>
+        <h3>光标级编辑</h3>
+        <p>表达式任意位置插入数字与符号，点击定位光标。千分位实时显示，内部始终保留原始串。</p>
+      </div>
+      <div class="card">
+        <div class="card-num">02 —</div>
+        <h3>智能括号</h3>
+        <p>一个 () 键自动判断左右：无括号开左括号，有未闭合补右括号，连续输入识别复合公式同向处理。</p>
+      </div>
+      <div class="card">
+        <div class="card-num">03 —</div>
+        <h3>双模式历史</h3>
+        <p>平常：按 = 才记录；激进：停顿可配置（默认 10 秒）自动记录。多选删除、一键清空，全部本地保存。</p>
+      </div>
+      <div class="card">
+        <div class="card-num">04 —</div>
+        <h3>单位换算</h3>
+        <p>原值 / 千 / 万 / 百万 / 千万 / 亿 / 十亿。结果整体换算，历史记录随单位实时重算，小值智能回退。</p>
+      </div>
+      <div class="card">
+        <div class="card-num">05 —</div>
+        <h3>科学模式</h3>
+        <p>三角函数、对数、幂、开方、阶乘、DEG/RAD 切换与记忆功能，一键在简洁与专业间切换。</p>
+      </div>
+      <div class="card">
+        <div class="card-num">06 —</div>
+        <h3>贴心细节</h3>
+        <p>超长公式自动缩字号完整显示、零过多转科学计数法、CASIO 式上下文百分号、长按公式复制到剪贴板。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="engine">
+  <div class="wrap">
+    <div class="strip">
+      <h3>算得对，也算得巧</h3>
+      <p>手写递归下降解析器 · 隐式乘法 · 上下文百分号</p>
+      <div class="lines">
+        <div class="line"><span>0.053 × 54.26%</span><b>0.0287578</b></div>
+        <div class="line"><span>100 − 12.5%</span><b>87.5</b></div>
+        <div class="line"><span>(1+2) × (3+4)</span><b>21</b></div>
+        <div class="line"><span>2(3+4)</span><b>14</b></div>
+        <div class="line"><span>1,234,567.89 → 万</span><b>123.46 万</b></div>
+        <div class="line"><span>0.0000002</span><b>2e−7</b></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="download">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-kicker">02 / GET IT</div>
+      <h2>拿去用</h2>
+      <p>直接装到手机，或者先在浏览器里试试手感。源码完全开放，MIT 协议，随便改。</p>
+    </div>
+    <div class="download">
+      <div class="dl-box">
+        <h3>Android 安装包</h3>
+        <p>自签名 release 版，Android 7.0 及以上。首次安装需允许「安装未知来源应用」。</p>
+        <a class="btn btn-primary" href="apk/ink-calculator-v1.5.apk">↓ 下载 v1.5 APK</a>
+        <div class="version">ink-calculator-v1.5.apk · 3.1 MB</div>
+      </div>
+      <div class="dl-box">
+        <h3>浏览器单文件版</h3>
+        <p>一个 HTML 文件，零依赖，双击即用。和 APK 里的界面源码完全一致。</p>
+        <a class="btn btn-ghost" href="app/index.html" target="_blank">在线打开 ↗</a>
+        <div class="version">app/index.html · 62 KB · 离线可用</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;width:100%;">
+    <div>
+      <span class="f-brand">Ink Calculator</span>
+      <span class="mit"> · MIT © 2026 Benyi Chan</span>
+    </div>
+    <div>
+      <a href="https://github.com/benyichan/ink-calculator" target="_blank" rel="noopener">源码</a>
+      <a href="https://github.com/benyichan/ink-calculator/releases" target="_blank" rel="noopener">Releases</a>
+      <a href="https://github.com/benyichan" target="_blank" rel="noopener">作者</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

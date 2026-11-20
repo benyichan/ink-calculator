@@ -1,0 +1,1577 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="eink">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#e9e8e3">
+<title>计算器</title>
+<style>
+  :root{
+    --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    --font-mono:"SF Mono",SFMono-Regular,Consolas,"JetBrains Mono",Menlo,monospace;
+    --font-num:-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+    --radius:9px;
+    --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  }
+  /* ---------- 墨水屏（默认） ---------- */
+  [data-theme="eink"]{
+    --bg:#e9e8e3;
+    --paper:#e9e8e3;
+    --ink:#20201e;
+    --ink-soft:#7a7a72;
+    --line:#bdbcb5;
+    --card:#e9e8e3;
+    --display-bg:#e2e1da;
+    --fn-bg:#dcdad2;
+    --fn-ink:#4a4a42;
+    --num-bg:#f4f3ec;
+    --num-ink:#20201e;
+    --op-bg:#5a5952;
+    --op-ink:#f4f3ec;
+    --eq-bg:#4a4942;
+    --eq-ink:#f4f3ec;
+    --danger:#8a4a42;
+    --accent:#3a3a34;
+    --chip-bg:#dcdad2;
+    --chip-ink:#4a4a42;
+    --shadow:0 1px 2px rgba(40,40,36,.10),0 6px 24px rgba(40,40,36,.06);
+    --grain-op:.05;
+  }
+  /* ---------- 深色（夜间纸感） ---------- */
+  [data-theme="dark"]{
+    --bg:#1c1c1a;
+    --paper:#1c1c1a;
+    --ink:#e9e8e1;
+    --ink-soft:#9a9a90;
+    --line:#3a3a34;
+    --card:#232320;
+    --display-bg:#232320;
+    --fn-bg:#2a2a26;
+    --fn-ink:#b0b0a4;
+    --num-bg:#2e2e2a;
+    --num-ink:#e9e8e1;
+    --op-bg:#4a4942;
+    --op-ink:#f0f0e6;
+    --eq-bg:#6a6a5e;
+    --eq-ink:#fff;
+    --danger:#c08a80;
+    --accent:#c8c8bc;
+    --chip-bg:#2a2a26;
+    --chip-ink:#b0b0a4;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 24px rgba(0,0,0,.3);
+    --grain-op:.035;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    font-family:var(--font-sans);
+    background:var(--bg);
+    color:var(--ink);
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+    transition:background .25s ease,color .25s ease;
+    overflow:hidden;
+  }
+  /* 纸张纹理 */
+  body::before{
+    content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:var(--grain);opacity:var(--grain-op);
+  }
+
+  .app{
+    position:relative;z-index:1;
+    height:100vh;height:100dvh;
+    max-width:460px;margin:0 auto;
+    display:flex;flex-direction:column;
+    padding:14px 16px 16px;
+    gap:12px;
+  }
+
+  /* ---------- topbar ---------- */
+  .topbar{display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+  .brand{font-weight:800;font-size:20px;letter-spacing:.5px;color:var(--ink);}
+  .top-actions{display:flex;gap:6px;}
+  .icon-btn{
+    width:36px;height:36px;border-radius:8px;border:1px solid var(--line);
+    background:var(--fn-bg);color:var(--fn-ink);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    transition:transform .12s ease,background .15s ease;
+  }
+  .icon-btn:active{transform:translateY(1px);}
+  .icon-btn svg{width:17px;height:17px;}
+  .hidden{display:none !important;}
+
+  /* ---------- modebar ---------- */
+  .modebar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-shrink:0;}
+  .seg{display:flex;background:var(--fn-bg);border:1px solid var(--line);border-radius:9px;padding:3px;gap:3px;}
+  .seg button{
+    border:none;background:transparent;color:var(--ink-soft);font-size:12px;font-weight:600;
+    padding:5px 15px;border-radius:6px;cursor:pointer;transition:all .15s ease;font-family:var(--font-sans);
+  }
+  .seg button.on{background:var(--num-bg);color:var(--ink);box-shadow:0 1px 2px rgba(40,40,36,.12);}
+
+  /* ---------- display ---------- */
+  .display{
+    background:var(--display-bg);
+    border:1px solid var(--line);
+    border-radius:12px;
+    box-shadow:inset 0 1px 3px rgba(40,40,36,.06);
+    padding:14px 18px 12px;
+    display:flex;flex-direction:column;gap:8px;
+    min-height:120px;flex-shrink:0;
+    position:relative;
+  }
+  .display-top{display:flex;align-items:center;justify-content:space-between;min-height:18px;}
+  .indicators{display:flex;gap:8px;align-items:center;min-height:16px;}
+  .unit-picker{position:relative;}
+  .unit-trigger{
+    border:1px solid var(--line);background:var(--fn-bg);color:var(--fn-ink);
+    font-size:11px;font-weight:600;padding:3px 7px;border-radius:6px;cursor:pointer;
+    font-family:var(--font-sans);display:inline-flex;align-items:center;gap:5px;
+    -webkit-tap-highlight-color:transparent;user-select:none;
+  }
+  .unit-trigger .caret{
+    display:inline-block;width:0;height:0;
+    border-left:3.5px solid transparent;border-right:3.5px solid transparent;
+    border-top:4px solid var(--fn-ink);transition:transform .15s ease;
+  }
+  .unit-picker.open .unit-trigger .caret{transform:rotate(180deg);}
+  .unit-menu{
+    position:absolute;top:calc(100% + 5px);left:0;z-index:50;
+    min-width:76px;padding:3px;display:none;flex-direction:column;gap:1px;
+    background:var(--num-bg);border:1px solid var(--line);border-radius:8px;
+    box-shadow:var(--shadow);
+  }
+  .unit-picker.open .unit-menu{display:flex;}
+  .unit-opt{
+    font-family:var(--font-sans);font-size:12px;font-weight:500;color:var(--ink);
+    padding:7px 9px;border-radius:5px;cursor:pointer;text-align:left;
+    display:flex;align-items:center;justify-content:space-between;
+    -webkit-tap-highlight-color:transparent;user-select:none;
+  }
+  .unit-opt.sel{background:var(--accent);color:var(--eq-ink);font-weight:700;}
+  .unit-opt .tick{font-size:11px;opacity:0;}
+  .unit-opt.sel .tick{opacity:1;}
+  .ind{
+    font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.5px;
+    padding:1px 7px;border-radius:5px;background:transparent;border:1px solid transparent;cursor:default;
+  }
+  .ind.on{color:var(--ink);border-color:var(--line);}
+  #degInd{cursor:pointer;}
+  #expr{
+    width:100%;min-height:50px;color:var(--ink);
+    font-family:var(--font-num);
+    font-variant-numeric:tabular-nums;
+    font-feature-settings:"tnum" 1,"lnum" 1;
+    font-weight:600;font-size:44px;line-height:1.15;
+    text-align:right;cursor:text;overflow-x:auto;white-space:nowrap;
+    scrollbar-width:none;
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+  }
+  #expr *{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
+  #expr::-webkit-scrollbar{display:none;}
+  #expr .expr-placeholder{color:var(--ink-soft);opacity:.5;}
+  #expr .caret{
+    display:inline-block;width:0;height:1.05em;border-left:2px solid var(--accent);
+    vertical-align:-0.12em;margin-left:-1px;
+    animation:caretBlink 1.1s step-end infinite;
+  }
+  @keyframes caretBlink{0%,100%{opacity:1;}50%{opacity:0;}}
+  #result{
+    flex:1;
+    text-align:right;font-family:var(--font-num);
+    font-variant-numeric:tabular-nums;
+    font-feature-settings:"tnum" 1,"lnum" 1;
+    font-size:19px;font-weight:500;
+    color:var(--ink-soft);min-height:24px;word-break:break-all;
+  }
+  .result-row{display:flex;align-items:center;gap:10px;min-height:32px;}
+  .backspace-btn{
+    flex-shrink:0;width:40px;height:30px;border-radius:7px;
+    background:var(--op-bg);color:var(--op-ink);border:1px solid transparent;
+    font-size:17px;font-family:var(--font-sans);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .backspace-btn:active{transform:translateY(1px);filter:brightness(.94);}
+  #toast{
+    position:fixed;left:50%;top:76px;transform:translateX(-50%) translateY(-8px);
+    background:var(--accent);color:var(--eq-ink);font-family:var(--font-sans);
+    font-size:13px;font-weight:600;padding:9px 18px;border-radius:20px;
+    box-shadow:var(--shadow);opacity:0;pointer-events:none;z-index:200;
+    transition:opacity .2s ease,transform .2s ease;
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  #result.pulse{animation:pulse .35s ease;}
+  @keyframes pulse{45%{color:var(--accent);}}
+
+  /* ---------- keypad（撑满剩余空间） ---------- */
+  .keypad{flex:1;min-height:0;display:flex;flex-direction:column;}
+  .grid{display:grid;gap:10px;flex:1;min-height:0;height:100%;}
+  .grid-simple{grid-template-columns:repeat(4,1fr);grid-auto-rows:1fr;}
+  .grid-sci{grid-template-columns:repeat(5,1fr);grid-auto-rows:1fr;}
+
+  button.btn{
+    height:100%;min-height:0;border:1px solid var(--line);border-radius:var(--radius);
+    cursor:pointer;font-family:var(--font-sans);font-weight:600;color:var(--ink);
+    transition:transform .08s ease,filter .12s ease;
+    user-select:none;position:relative;
+    box-shadow:0 1px 2px rgba(40,40,36,.08);
+    display:flex;align-items:center;justify-content:center;
+  }
+  button.btn:active{transform:translateY(1px);box-shadow:none;filter:brightness(.97);}
+  button.btn.num{background:var(--num-bg);color:var(--num-ink);font-size:26px;font-weight:700;}
+  button.btn.fn{background:var(--fn-bg);color:var(--fn-ink);font-size:15px;font-weight:500;}
+  button.btn.op{background:var(--op-bg);color:var(--op-ink);font-size:26px;font-weight:500;border-color:transparent;}
+  button.btn.eq{background:var(--eq-bg);color:var(--eq-ink);font-size:28px;border-color:transparent;}
+  button.btn.danger{color:var(--danger);}
+  button.btn.span2{grid-column:span 2;}
+  button.btn.spanRow2{grid-row:span 2;}
+
+  /* ---------- drawer / modal（墨水屏风格） ---------- */
+  .backdrop{position:fixed;inset:0;background:rgba(40,40,36,.35);opacity:0;pointer-events:none;transition:opacity .25s ease;z-index:40;}
+  .backdrop.show{opacity:1;pointer-events:auto;}
+  .drawer{
+    position:fixed;top:0;right:0;bottom:0;width:min(360px,100vw);z-index:50;
+    background:var(--card);border-left:1px solid var(--line);
+    box-shadow:-10px 0 40px rgba(40,40,36,.15);
+    transform:translateX(100%);transition:transform .28s cubic-bezier(.2,.8,.2,1);
+    display:flex;flex-direction:column;
+  }
+  .drawer.show{transform:translateX(0);}
+  .drawer-head{padding:18px 18px 14px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:12px;}
+  .drawer-head .row1{display:flex;align-items:center;justify-content:space-between;}
+  .drawer-title{font-size:16px;font-weight:700;}
+  .drawer-count{font-size:12px;color:var(--ink-soft);}
+  .drawer-head .row2{display:flex;gap:8px;}
+  .chip-btn{
+    flex:1;height:36px;border-radius:8px;border:1px solid var(--line);
+    background:var(--chip-bg);color:var(--chip-ink);font-size:13px;font-weight:600;cursor:pointer;
+    transition:transform .12s ease;
+  }
+  .chip-btn:active{transform:translateY(1px);}
+  .chip-btn.danger{color:var(--danger);}
+  .chip-btn.on{background:var(--eq-bg);color:var(--eq-ink);border-color:transparent;}
+  .history-list{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;}
+  .history-list::-webkit-scrollbar{width:5px;}
+  .history-list::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px;}
+  .hist-empty{text-align:center;color:var(--ink-soft);font-size:13px;padding:40px 0;}
+  .hist-item{
+    display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:10px;
+    background:var(--fn-bg);border:1px solid var(--line);cursor:pointer;
+    transition:transform .12s ease;
+  }
+  .hist-item:active{transform:translateY(1px);}
+  .hist-item.sel{border-color:var(--accent);background:var(--display-bg);}
+  .sel-box{
+    width:20px;height:20px;border-radius:5px;border:2px solid var(--ink-soft);flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;transition:all .15s ease;
+    opacity:0;transform:scale(.6);
+  }
+  .sel-box.on{opacity:1;transform:scale(1);background:var(--accent);border-color:transparent;}
+  .sel-box.on::after{content:'';width:9px;height:5px;border-left:2px solid var(--bg);border-bottom:2px solid var(--bg);transform:rotate(-45deg) translate(0,-1px);}
+  .selection .sel-box{opacity:1;transform:scale(1);}
+  .hist-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;align-items:flex-end;}
+  .hist-expr{font-size:13px;color:var(--ink-soft);word-break:break-all;text-align:right;font-family:var(--font-num);font-variant-numeric:tabular-nums;}
+  .hist-res{font-size:18px;font-weight:700;word-break:break-all;text-align:right;font-family:var(--font-num);font-variant-numeric:tabular-nums;}
+  .drawer-foot{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;}
+
+  .modal{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .2s ease;}
+  .modal.show{opacity:1;pointer-events:auto;}
+  .modal-card{
+    width:100%;max-width:340px;background:var(--card);border:1px solid var(--line);
+    border-radius:14px;box-shadow:var(--shadow);padding:20px;
+    display:flex;flex-direction:column;gap:16px;transform:translateY(8px);transition:transform .2s ease;
+  }
+  .modal.show .modal-card{transform:translateY(0);}
+  .modal-title{font-size:16px;font-weight:700;}
+  .modal-body{font-size:13px;color:var(--ink-soft);line-height:1.6;}
+  .field{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .field label{font-size:14px;}
+  .field input{
+    width:90px;height:38px;border-radius:8px;border:1px solid var(--line);
+    background:var(--display-bg);color:var(--ink);font-size:15px;text-align:center;outline:none;font-family:var(--font-mono);
+  }
+  .field input:focus{border-color:var(--accent);}
+  .modal-actions{display:flex;gap:8px;justify-content:flex-end;}
+  .modal-actions button{
+    height:38px;padding:0 18px;border-radius:8px;border:1px solid var(--line);
+    background:var(--chip-bg);color:var(--chip-ink);font-size:13px;font-weight:600;cursor:pointer;
+  }
+  .modal-actions button.primary{background:var(--eq-bg);color:var(--eq-ink);border-color:transparent;}
+  .modal-actions button.danger{color:var(--danger);}
+
+  @media (max-width:480px){
+    #expr{font-size:38px;}
+  }
+  @media (min-width:481px){
+    body{display:flex;align-items:center;justify-content:center;padding:24px;}
+    .app{height:min(92vh,860px);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);background:var(--paper);}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand">计算器</div>
+    <div class="top-actions">
+      <button class="icon-btn" id="themeBtn" title="切换主题" aria-label="切换主题">
+        <svg id="themeSun" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4" fill="currentColor"/><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
+        <svg id="themeMoon" class="hidden" viewBox="0 0 24 24" fill="none"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" fill="currentColor"/></svg>
+      </button>
+      <button class="icon-btn" id="historyBtn" title="计算历史" aria-label="计算历史">
+        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="icon-btn" id="settingsBtn" title="设置" aria-label="设置">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="7" cy="18" r="2" fill="currentColor" stroke="none"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="modebar">
+    <div class="seg" id="calcSeg">
+      <button class="on" data-cm="simple">简单</button>
+      <button data-cm="sci">科学</button>
+    </div>
+    <div class="seg" id="histSeg">
+      <button data-mode="aggressive">激进</button>
+      <button class="on" data-mode="normal">平常</button>
+    </div>
+  </div>
+
+  <div class="display">
+    <div class="display-top">
+      <div class="indicators" id="indicators" style="display:none">
+        <span class="ind" id="degInd" title="点击切换角度/弧度">DEG</span>
+        <span class="ind" id="memInd">M</span>
+      </div>
+      <div class="unit-picker" id="unitPicker">
+        <div class="unit-trigger" id="unitTrigger"><span id="unitLabel">原值</span><span class="caret"></span></div>
+        <div class="unit-menu" id="unitMenu"></div>
+      </div>
+    </div>
+    <div id="expr"></div>
+    <div class="result-row">
+      <div id="result"></div>
+      <button class="backspace-btn" data-act="backspace" title="删除">⌫</button>
+    </div>
+  </div>
+
+  <div class="keypad" id="keypad">
+    <div class="grid grid-sci" id="gridSci" style="display:none">
+      <button class="btn fn" data-ins="sin(">sin</button>
+      <button class="btn fn" data-ins="cos(">cos</button>
+      <button class="btn fn" data-ins="tan(">tan</button>
+      <button class="btn fn" data-ins="π">π</button>
+      <button class="btn fn danger" data-act="backspace">⌫</button>
+      <button class="btn fn" data-ins="ln(">ln</button>
+      <button class="btn fn" data-ins="log(">log</button>
+      <button class="btn fn" data-ins="e">e</button>
+      <button class="btn fn" data-ins="^">^</button>
+      <button class="btn fn" data-ins="sqrt(">√</button>
+      <button class="btn num" data-ins="7">7</button>
+      <button class="btn num" data-ins="8">8</button>
+      <button class="btn num" data-ins="9">9</button>
+      <button class="btn op" data-ins="÷">÷</button>
+      <button class="btn fn" data-ins="(">(</button>
+      <button class="btn num" data-ins="4">4</button>
+      <button class="btn num" data-ins="5">5</button>
+      <button class="btn num" data-ins="6">6</button>
+      <button class="btn op" data-ins="×">×</button>
+      <button class="btn fn" data-ins=")">)</button>
+      <button class="btn num" data-ins="1">1</button>
+      <button class="btn num" data-ins="2">2</button>
+      <button class="btn num" data-ins="3">3</button>
+      <button class="btn op" data-ins="−">−</button>
+      <button class="btn eq spanRow2" data-act="equals">=</button>
+      <button class="btn num" data-ins="0">0</button>
+      <button class="btn num" data-ins="00">00</button>
+      <button class="btn num" data-ins=".">.</button>
+      <button class="btn op" data-ins="+">+</button>
+    </div>
+    <div class="grid grid-simple" id="gridSimple">
+      <button class="btn num danger" data-act="clear">C</button>
+      <button class="btn fn" data-act="paren" style="font-size:22px;font-weight:600;">()</button>
+      <button class="btn num" data-ins="%">%</button>
+      <button class="btn op" data-ins="÷">÷</button>
+      <button class="btn num" data-ins="7">7</button>
+      <button class="btn num" data-ins="8">8</button>
+      <button class="btn num" data-ins="9">9</button>
+      <button class="btn op" data-ins="×">×</button>
+      <button class="btn num" data-ins="4">4</button>
+      <button class="btn num" data-ins="5">5</button>
+      <button class="btn num" data-ins="6">6</button>
+      <button class="btn op" data-ins="−">−</button>
+      <button class="btn num" data-ins="1">1</button>
+      <button class="btn num" data-ins="2">2</button>
+      <button class="btn num" data-ins="3">3</button>
+      <button class="btn op" data-ins="+">+</button>
+      <button class="btn num" data-ins="0">0</button>
+      <button class="btn num" data-ins="00">00</button>
+      <button class="btn num" data-ins=".">.</button>
+      <button class="btn eq" data-act="equals">=</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div class="backdrop" id="backdrop"></div>
+
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <div class="row1">
+      <span class="drawer-title">计算历史</span>
+      <span class="drawer-count" id="histCount">0 条</span>
+    </div>
+    <div class="row2">
+      <button class="chip-btn" id="selToggle">多选</button>
+      <button class="chip-btn danger" id="clearAllBtn">清空</button>
+    </div>
+  </div>
+  <div class="history-list" id="historyList"></div>
+  <div class="drawer-foot hidden" id="drawerFoot">
+    <button class="chip-btn" id="selectAllBtn">全选</button>
+    <button class="chip-btn danger" id="deleteSelBtn">删除所选</button>
+    <button class="chip-btn" id="cancelSelBtn">取消</button>
+  </div>
+</div>
+
+<div class="modal" id="settingsModal">
+  <div class="modal-card">
+    <div class="modal-title">设置</div>
+    <div class="field">
+      <label for="maxHistInput">最大历史条数</label>
+      <input id="maxHistInput" type="number" min="1" max="1000" value="30">
+    </div>
+    <div class="field">
+      <label for="aggDelayInput">激进模式停顿（秒）</label>
+      <input id="aggDelayInput" type="number" min="1" max="120" step="1" value="10">
+    </div>
+    <div class="modal-body">历史记录仅保存在本机浏览器（localStorage），不会上传。切换到「激进」模式后，输入停止超过设定时长即自动记入历史（无需按 = 号）。</div>
+    <div class="modal-actions">
+      <button id="settingsClose">取消</button>
+      <button class="primary" id="settingsSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="confirmModal">
+  <div class="modal-card">
+    <div class="modal-title">确认操作</div>
+    <div class="modal-body" id="confirmMsg"></div>
+    <div class="modal-actions">
+      <button id="confirmCancel">取消</button>
+      <button class="danger" id="confirmOk">确定</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  var LS_KEY = 'buddy_calculator_v1';
+  var DEFAULT_STATE = {
+    history: [],
+    mode: 'normal',
+    maxHistory: 30,
+    theme: 'eink',
+    deg: true,
+    memory: 0,
+    ans: 0,
+    calcMode: 'simple',
+    unit: 0,
+    aggDelay: 10000,
+    aggV: 3
+  };
+
+  function load(){
+    try{
+      var raw = localStorage.getItem(LS_KEY);
+      if(raw){
+        var d = JSON.parse(raw);
+        var out = {};
+        for(var k in DEFAULT_STATE){ out[k] = (d[k] !== undefined) ? d[k] : DEFAULT_STATE[k]; }
+        if(typeof out.maxHistory !== 'number' || out.maxHistory < 1 || out.maxHistory > 1000) out.maxHistory = 30;
+        if(out.mode !== 'aggressive') out.mode = 'normal';
+        if(out.calcMode !== 'sci') out.calcMode = 'simple';
+        if(typeof out.unit !== 'number' || out.unit < 0 || out.unit > 6) out.unit = 0;
+        if(typeof out.aggDelay !== 'number' || out.aggDelay < 300 || out.aggDelay > 120000) out.aggDelay = 10000;
+        /* 一次性迁移：升级到新默认 10s（用户明确要求） */
+        if(out.aggV !== 3){ out.aggDelay = 10000; out.aggV = 3; }
+        if(out.theme !== 'dark' && out.theme !== 'eink') out.theme = 'eink';
+        if(!Array.isArray(out.history)) out.history = [];
+        return out;
+      }
+    }catch(e){}
+    return JSON.parse(JSON.stringify(DEFAULT_STATE));
+  }
+  function save(){
+    try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){}
+  }
+
+  var state = load();
+
+  var exprBox = document.getElementById('expr');
+  var exprStr = '';
+  var caretPos = 0;
+  var justEvaluated = false;   /* 刚按过 =，主显示区可整体按单位换算 */
+  var resultRaw = null;        /* 刚算出的原始数值 */
+  var resultEl = document.getElementById('result');
+  var memInd = document.getElementById('memInd');
+  var degInd = document.getElementById('degInd');
+  var historyList = document.getElementById('historyList');
+  var histCount = document.getElementById('histCount');
+  var drawer = document.getElementById('drawer');
+  var backdrop = document.getElementById('backdrop');
+  var drawerFoot = document.getElementById('drawerFoot');
+
+  var selectionMode = false;
+  var selected = {};
+  var aggTimer = null;
+  var confirmCb = null;
+
+  /* ---------- tokenizer & parser ---------- */
+  var FUNCS = ['asin','acos','atan','sinh','cosh','tanh','sqrt','cbrt','floor','ceil','round','sin','cos','tan','log','ln','abs','exp'];
+
+  function tokenize(expr){
+    var s = String(expr).replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-').replace(/π/g,'pi');
+    var tokens = [];
+    var i = 0, n = s.length;
+    while(i < n){
+      var c = s[i];
+      if(c === ' ' || c === '\t'){ i++; continue; }
+      if(/[0-9.]/.test(c)){
+        var j = i, dots = 0;
+        while(j < n && (/[0-9]/.test(s[j]) || s[j] === '.')){ if(s[j] === '.') dots++; j++; }
+        if(dots > 1) throw new Error('数字格式错误');
+        tokens.push({type:'num', value:parseFloat(s.slice(i,j))});
+        i = j; continue;
+      }
+      if(/[a-zA-Z]/.test(c)){
+        var k2 = i;
+        while(k2 < n && /[a-zA-Z]/.test(s[k2])) k2++;
+        var word = s.slice(i, k2);
+        if(word === 'pi'){ tokens.push({type:'num', value:Math.PI}); i = k2; continue; }
+        if(word === 'e'){ tokens.push({type:'num', value:Math.E}); i = k2; continue; }
+        if(FUNCS.indexOf(word) >= 0){ tokens.push({type:'func', value:word}); i = k2; continue; }
+        throw new Error('未知函数: ' + word);
+      }
+      if(c === '(' || c === ')'){ tokens.push({type:'paren', value:c}); i++; continue; }
+      if(c === '+' || c === '-' || c === '*' || c === '/' || c === '^'){ tokens.push({type:'op', value:c}); i++; continue; }
+      if(c === '%' || c === '!'){ tokens.push({type:'post', value:c}); i++; continue; }
+      throw new Error('无法识别的字符: ' + c);
+    }
+    return tokens;
+  }
+
+  function Parser(tokens){ this.tokens = tokens; this.i = 0; this.termPct = null; this.lastTermPct = null; }
+  Parser.prototype.peek = function(){ return this.tokens[this.i]; };
+  Parser.prototype.next = function(){ return this.tokens[this.i++]; };
+  Parser.prototype.parse = function(){
+    var v = this.parseExpr();
+    if(this.i < this.tokens.length) throw new Error('表达式不完整');
+    return v;
+  };
+  Parser.prototype.parseExpr = function(){
+    var left = this.parseTerm();
+    while(this.peek() && this.peek().type === 'op' && (this.peek().value === '+' || this.peek().value === '-')){
+      var op = this.next().value;
+      var right = this.parseTerm();
+      var pct = this.lastTermPct;
+      if(pct){
+        /* 上下文百分号：A ± B%  →  A ± A×B%（与 CASIO / iOS 一致） */
+        if(op === '+') left = left + left * pct.raw / 100;
+        else left = left - left * pct.raw / 100;
+      } else {
+        left = (op === '+') ? (left + right) : (left - right);
+      }
+    }
+    return left;
+  };
+  Parser.prototype.parseTerm = function(){
+    this.termPct = null;
+    var left = this.parseFactor();
+    var firstPct = this.termPct;
+    var multi = false;
+    while(this.peek()){
+      var t = this.peek();
+      var isMul = (t.type === 'op' && (t.value === '*' || t.value === '/'));
+      var isImplicit = (t.type === 'num' || t.type === 'func' || (t.type === 'paren' && t.value === '('));
+      if(!isMul && !isImplicit) break;
+      var right;
+      if(isMul){ this.next(); right = this.parseFactor(); left = (t.value === '*') ? (left * right) : (left / right); }
+      else { right = this.parseFactor(); left = left * right; }
+      multi = true;
+    }
+    /* 只有「单独的 数字%」才具备上下文百分号语义 */
+    this.lastTermPct = multi ? null : firstPct;
+    this.termPct = null;
+    return left;
+  };
+  Parser.prototype.parseFactor = function(){
+    var base = this.parseUnary();
+    if(this.peek() && this.peek().type === 'op' && this.peek().value === '^'){
+      this.next();
+      var savedPct = this.termPct;
+      var exp = this.parseFactor();
+      this.termPct = savedPct;
+      return Math.pow(base, exp);
+    }
+    return base;
+  };
+  Parser.prototype.parseUnary = function(){
+    if(this.peek() && this.peek().type === 'op' && (this.peek().value === '-' || this.peek().value === '+')){
+      var op = this.next().value;
+      var v = this.parseUnary();
+      if(op === '-' && this.termPct) this.termPct.raw = -this.termPct.raw;
+      return (op === '-') ? -v : v;
+    }
+    return this.parsePostfix();
+  };
+  Parser.prototype.parsePostfix = function(){
+    var tok = this.peek();
+    var v = this.parsePrimary();
+    var wasBareNum = (tok && tok.type === 'num');
+    while(this.peek() && this.peek().type === 'post'){
+      var p = this.next().value;
+      if(p === '%'){
+        if(wasBareNum && this.termPct === null) this.termPct = {raw:v};
+        v = v / 100;
+      }
+      else if(p === '!') v = factorial(v);
+      wasBareNum = false;
+    }
+    return v;
+  };
+  Parser.prototype.parsePrimary = function(){
+    var tok = this.peek();
+    if(!tok) throw new Error('表达式不完整');
+    if(tok.type === 'num'){ this.next(); return tok.value; }
+    if(tok.type === 'paren' && tok.value === '('){
+      this.next();
+      var v = this.parseExpr();
+      var close = this.next();
+      if(!close || close.type !== 'paren' || close.value !== ')') throw new Error('缺少右括号');
+      return v;
+    }
+    if(tok.type === 'func'){
+      this.next();
+      var open = this.next();
+      if(!open || open.type !== 'paren' || open.value !== '(') throw new Error(tok.value + ' 后需要括号');
+      var arg = this.parseExpr();
+      var c2 = this.next();
+      if(!c2 || c2.type !== 'paren' || c2.value !== ')') throw new Error('缺少右括号');
+      return applyFunc(tok.value, arg);
+    }
+    throw new Error('意外的符号');
+  };
+
+  function factorial(n){
+    if(n < 0 || !isFinite(n) || Math.floor(n) !== n) throw new Error('阶乘需要非负整数');
+    if(n > 170) throw new Error('数值过大');
+    var r = 1;
+    for(var i = 2; i <= n; i++) r *= i;
+    return r;
+  }
+
+  function applyFunc(name, x){
+    var r = (state.deg && (name === 'sin' || name === 'cos' || name === 'tan')) ? (x * Math.PI / 180) : x;
+    switch(name){
+      case 'sin': return Math.sin(r);
+      case 'cos': return Math.cos(r);
+      case 'tan': return Math.tan(r);
+      case 'asin': { var a = Math.asin(x); return state.deg ? a * 180 / Math.PI : a; }
+      case 'acos': { var a = Math.acos(x); return state.deg ? a * 180 / Math.PI : a; }
+      case 'atan': { var a = Math.atan(x); return state.deg ? a * 180 / Math.PI : a; }
+      case 'sinh': return Math.sinh(x);
+      case 'cosh': return Math.cosh(x);
+      case 'tanh': return Math.tanh(x);
+      case 'sqrt': return Math.sqrt(x);
+      case 'cbrt': return Math.cbrt(x);
+      case 'abs': return Math.abs(x);
+      case 'exp': return Math.exp(x);
+      case 'log': return Math.log10(x);
+      case 'ln': return Math.log(x);
+      case 'floor': return Math.floor(x);
+      case 'ceil': return Math.ceil(x);
+      case 'round': return Math.round(x);
+      default: throw new Error('未知函数');
+    }
+  }
+
+  function evaluate(expr){
+    var tokens = tokenize(expr);
+    if(tokens.length === 0) throw new Error('空表达式');
+    var p = new Parser(tokens);
+    return p.parse();
+  }
+
+  function formatResult(v){
+    if(typeof v !== 'number' || isNaN(v)) return '无效';
+    if(!isFinite(v)) return v > 0 ? '∞' : '-∞';
+    if(v === 0) return '0';
+    var a = Math.abs(v);
+    if(a >= 1e15 || a < 1e-9){
+      return v.toExponential(8).replace(/\.?0+e/,'e').replace('e+','e');
+    }
+    return parseFloat(v.toPrecision(12)).toString();
+  }
+
+  /* 千分位显示（仅用于结果/历史展示，不影响表达式内部计算） */
+  function formatDisplay(v){
+    var s = formatResult(v);
+    if(s === '无效' || s === '∞' || s === '-∞') return s;
+    if(s.indexOf('e') >= 0 || s.indexOf('E') >= 0) return s;
+    var neg = s[0] === '-';
+    if(neg) s = s.slice(1);
+    var parts = s.split('.');
+    var intPart = parts[0];
+    var decPart = parts[1] ? '.' + parts[1] : '';
+    /* 零特别多 / 小数位特别长 → 科学计数法 */
+    var frac = parts[1] || '';
+    if(frac && tooVerbose(intPart, frac)) return toSci(v, 12);
+    intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return (neg ? '-' : '') + intPart + decPart;
+  }
+
+  /* 表达式区：数字部分实时加千分位（仅显示层）
+     注意：紧跟 e/E 的数字是指数部分，不加分隔符 */
+  function formatExprDisplay(s){
+    var out = '';
+    var i = 0;
+    while(i < s.length){
+      var c = s[i];
+      if(/[0-9]/.test(c)){
+        /* 判断是否为指数部分：前一个非数字字符是 e/E */
+        var prev = out.replace(/[,\s]/g,'').slice(-1);
+        var isExp = (prev === 'e' || prev === 'E');
+        var j = i, dots = 0;
+        while(j < s.length && (/[0-9]/.test(s[j]) || (s[j] === '.' && dots === 0))){ if(s[j]==='.') dots++; j++; }
+        var num = s.slice(i, j);
+        if(isExp){
+          out += num;
+        } else {
+          var parts = num.split('.');
+          parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+          out += parts.join('.');
+        }
+        i = j;
+        continue;
+      }
+      out += c;
+      i++;
+    }
+    return out;
+  }
+  /* 原始字符位置 → 显示（含逗号）位置 */
+  function toDispPos(p){
+    var disp = formatExprDisplay(exprStr);
+    var count = 0;
+    for(var dp = 0; dp < disp.length; dp++){
+      if(count === p) return dp;
+      if(disp[dp] !== ',') count++;
+    }
+    return disp.length;
+  }
+  /* 显示位置 → 原始字符位置 */
+  function toRawPos(dp){
+    var disp = formatExprDisplay(exprStr);
+    var count = 0;
+    for(var i = 0; i < dp && i < disp.length; i++){
+      if(disp[i] !== ',') count++;
+    }
+    return count;
+  }
+
+  /* 显示单位切换：原值/千/万/百万/千万/亿/十亿 */
+  var UNITS = [
+    {label:'原值', scale:1},
+    {label:'千', scale:1e3},
+    {label:'万', scale:1e4},
+    {label:'百万', scale:1e6},
+    {label:'千万', scale:1e7},
+    {label:'亿', scale:1e8},
+    {label:'十亿', scale:1e9}
+  ];
+  /* 科学计数法：2e-7 / 1.23e21
+     sig = 有效数字位数，保留原精度避免信息丢失 */
+  function toSci(v, sig){
+    if(sig == null) sig = 12;
+    var s = v.toExponential(sig - 1);
+    s = s.replace(/(\.\d*?)0+e/,'$1e').replace(/\.e/,'e');
+    return s.replace('e+','e');
+  }
+  /* 统计数字串里 0 的个数 */
+  function countZeros(s){
+    var n = 0;
+    for(var i = 0; i < s.length; i++){ if(s[i] === '0') n++; }
+    return n;
+  }
+  /* 小数部分前导零的个数 */
+  function leadZeros(frac){
+    var n = 0;
+    for(var i = 0; i < frac.length; i++){
+      if(frac[i] === '0') n++;
+      else break;
+    }
+    return n;
+  }
+  /* 零特别多 / 小数位特别长 → 用科学计数法
+     判据：0 总数 > 10、前导零 ≥ 5、小数位 ≥ 8 */
+  function tooVerbose(intPart, frac){
+    if(countZeros(intPart) + countZeros(frac) > 10) return true;
+    if(leadZeros(frac) >= 5) return true;
+    if(frac.length >= 8) return true;
+    return false;
+  }
+
+  /* 缩放后的数字格式化：>=1 保留 2 位；<1 按有效数字动态扩展，避免精度丢失 */
+  function scaleNum(scaled){
+    if(scaled === 0) return '0';
+    var a = Math.abs(scaled);
+    if(a >= 1){
+      /* 极大值用科学计数法，避免十几位数字撑爆显示区 */
+      if(a >= 1e15) return toSci(scaled, 4);
+      return scaled.toFixed(2).replace(/\.?0+$/,'');
+    }
+    /* 保留 4 位有效数字所需的十进制位数 */
+    var p = Math.ceil(-Math.log(a) / Math.LN10) + 3;
+    if(p < 4) p = 4;
+    if(p > 12) p = 12;
+    var s = scaled.toFixed(p);
+    if(s.indexOf('.') >= 0) s = s.replace(/(\.\d*?)0+$/,'$1').replace(/\.$/,'');
+    var sp = s.split('.');
+    var frac = sp[1] || '';
+    /* 前导零 ≥5 或小数位 ≥8 → 科学计数法（0.5 这类正常值不受影响） */
+    if(leadZeros(frac) >= 5 || frac.length >= 8) return toSci(scaled, 4);
+    return s;
+  }
+  /* 换算后小数点后前导零个数（纯十进制展开，不做科学计数） */
+  function scaledLeadZeros(a){
+    if(a === 0) return 0;
+    var e = Math.floor(Math.log10(a));
+    if(e >= 0) return 0;                    /* ≥1 没有小数部分 */
+    var p = Math.min(30, -e + 2);
+    var s = a.toFixed(p);
+    var dot = s.indexOf('.');
+    if(dot < 0) return 0;
+    return leadZeros(s.slice(dot + 1));
+  }
+  function formatWithUnit(v){
+    var u = UNITS[state.unit] || UNITS[0];
+    if(u.scale === 1) return formatDisplay(v);
+    if(typeof v !== 'number' || isNaN(v)) return '无效';
+    if(!isFinite(v)) return v > 0 ? '∞' : '-∞';
+    if(v === 0) return '0';
+    var scaled = v / u.scale;
+    /* 换算结果小数点后前 4 位全是 0（如 0.00001亿）→ 不显示换算结果，回退原值 */
+    if(scaledLeadZeros(Math.abs(scaled)) >= 4) return formatDisplay(v);
+    var neg = scaled < 0;
+    var s = scaleNum(Math.abs(scaled));
+    var parts = s.split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,',');
+    return (neg?'-':'') + parts.join('.') + u.label;
+  }
+
+  /* ---------- input editing ---------- */
+  function currentExpr(){ return exprStr; }
+
+  /* 当前主显示区的文本（单位换算态优先） */
+  function displayText(){
+    if(justEvaluated && state.unit !== 0 && resultRaw !== null){
+      return formatWithUnit(resultRaw);
+    }
+    return formatExprDisplay(exprStr);
+  }
+
+  function render(){
+    exprBox.innerHTML = '';
+    if(exprStr === ''){
+      var ph = document.createElement('span');
+      ph.className = 'expr-placeholder';
+      ph.textContent = '0';
+      exprBox.appendChild(ph);
+    }
+    var disp = displayText();
+    if(justEvaluated && state.unit !== 0 && resultRaw !== null){
+      /* 单位换算态：整段只读展示，不参与光标定位 */
+      var whole = document.createElement('span');
+      whole.textContent = disp;
+      exprBox.appendChild(whole);
+      return;
+    }
+    var dCaret = toDispPos(caretPos);
+    var before = disp.slice(0, dCaret);
+    var after = disp.slice(dCaret);
+    if(before){
+      var b = document.createElement('span');
+      b.textContent = before;
+      exprBox.appendChild(b);
+    }
+    var c = document.createElement('span');
+    c.className = 'caret';
+    exprBox.appendChild(c);
+    if(after){
+      var a = document.createElement('span');
+      a.textContent = after;
+      exprBox.appendChild(a);
+    }
+  }
+
+  /* 比例字体下按真实渲染宽度定位光标：
+     逐字符累加宽度，找到 x 落在哪个字符间隙 */
+  function posFromX(x){
+    var disp = displayText();
+    var rect = exprBox.getBoundingClientRect();
+    var cs = getComputedStyle(exprBox);
+    var padL = parseFloat(cs.paddingLeft) || 0;
+    var padR = parseFloat(cs.paddingRight) || 0;
+    var contentW = rect.width - padL - padR;
+    var canvas = document.createElement('canvas');
+    var ctx = canvas.getContext('2d');
+    ctx.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+    var totalW = ctx.measureText(disp).width;
+    if(totalW <= 0) return 0;
+    /* 显示文本右对齐，起点 = 内容区右端 - 文本总宽 */
+    var startX = rect.width - padR - totalW;
+    var rel = x - startX;
+    if(rel <= 0) return 0;
+    var acc = 0;
+    for(var i = 0; i < disp.length; i++){
+      var w = ctx.measureText(disp[i]).width;
+      if(rel < acc + w / 2) return i;
+      acc += w;
+    }
+    return disp.length;
+  }
+
+  /* 光标紧贴右括号左侧、且该括号内已含运算符（内部运算已完成）→ 视为可跳出 */
+  function caretAfterCompleteParen(){
+    if(caretPos >= exprStr.length || exprStr[caretPos] !== ')') return false;
+    var depth = 0, openIdx = -1;
+    for(var i = caretPos - 1; i >= 0; i--){
+      var ch = exprStr[i];
+      if(ch === ')') depth++;
+      else if(ch === '('){ if(depth === 0){ openIdx = i; break; } depth--; }
+    }
+    if(openIdx < 0) return false;
+    var inner = exprStr.slice(openIdx + 1, caretPos);
+    /* 必须以值结尾（数字/右括号/阶乘/百分号），若以运算符结尾说明运算未完成 */
+    if(/[+×÷^\-%.]$/.test(inner)) return false;
+    /* 排除开头负号后，内部须含二元运算符（说明括号已完成一段运算） */
+    return /[+×÷^]/.test(inner) || /-[^-]/.test(inner.slice(1));
+  }
+
+  /* 智能判断括号键应插入 '(' 还是 ')'
+     规则：
+       1) 场上无未闭合左括号 → '('
+       2) 有未闭合左括号 → ')'
+       3) 连续输入（上一字符就是括号，中间没数字）：
+          - 上一个是 '(' → 仍是 '('（嵌套复合公式，如 ((a+b)...)）
+          - 上一个是 ')' → 若外层还有未闭合则 ')'，否则 '('（开新组）
+       4) 已闭合的一对之后 → '('（开新组） */
+  function decideParen(){
+    var before = exprStr.slice(0, caretPos);
+    var open = 0, i, ch;
+    for(i = 0; i < before.length; i++){
+      ch = before[i];
+      if(ch === '(') open++;
+      else if(ch === ')'){ if(open > 0) open--; }
+    }
+    var last = before.slice(-1);
+    if(last === '(') return '(';
+    if(last === ')') return open > 0 ? ')' : '(';
+    return open > 0 ? ')' : '(';
+  }
+
+  function insertText(text){
+    justEvaluated = false; resultRaw = null;
+    /* 括号内运算已完成时输入运算符 → 光标跳出右括号，符合直觉
+       例：() 填 1+2 后按 × 应得到 (1+2)× 而非 (1+2×) */
+    var isOp = /^[+\-×÷^%]+$/.test(text);
+    if(isOp && caretAfterCompleteParen()) caretPos += 1;
+    exprStr = exprStr.slice(0, caretPos) + text + exprStr.slice(caretPos);
+    caretPos += text.length;
+    render();
+    onUserInput();
+  }
+
+  function backspace(){
+    if(caretPos <= 0) return;
+    justEvaluated = false; resultRaw = null;
+    exprStr = exprStr.slice(0, caretPos - 1) + exprStr.slice(caretPos);
+    caretPos -= 1;
+    render();
+    onUserInput();
+  }
+
+  function setExpr(text){
+    justEvaluated = false; resultRaw = null;
+    exprStr = text;
+    caretPos = exprStr.length;
+    render();
+  }
+
+  function clearAll(){
+    setExpr('');
+    resultEl.textContent = '';
+    autoSize();
+    onUserInput();
+  }
+
+  function negate(){
+    var expr = currentExpr().trim();
+    if(!expr) return;
+    try{
+      var v = evaluate(expr);
+      setExpr(formatResult(-v));
+      onUserInput();
+    }catch(e){}
+  }
+
+  /* ---------- preview & timer ---------- */
+  function updatePreview(){
+    var expr = currentExpr().trim();
+    if(!expr){ resultEl.textContent = ''; return; }
+    try{
+      var v = evaluate(expr);
+      /* 结果态：主显示区显示换算值，小字行给出原值对照 */
+      if(justEvaluated){
+        resultEl.textContent = (state.unit !== 0) ? ('= ' + formatDisplay(v)) : '';
+      } else {
+        resultEl.textContent = '= ' + formatWithUnit(v);
+      }
+      resultEl.classList.remove('error');
+    }catch(e){
+      resultEl.textContent = '';
+    }
+  }
+
+  function autoSize(){
+    var disp = displayText();
+    var len = disp.length;
+    var fs;
+    if(len <= 12) fs = 44;
+    else if(len <= 18) fs = 36;
+    else if(len <= 26) fs = 28;
+    else if(len <= 36) fs = 24;
+    else fs = 20;
+    if(window.innerWidth <= 480 && fs > 38) fs = 38;
+    exprBox.style.fontSize = fs + 'px';
+    /* 超长时按真实渲染宽度等比缩小，保证完整显示 */
+    var cs = getComputedStyle(exprBox);
+    var avail = exprBox.clientWidth - parseFloat(cs.paddingLeft || 0) - parseFloat(cs.paddingRight || 0);
+    if(len > 0){
+      var canvas = document.createElement('canvas');
+      var ctx = canvas.getContext('2d');
+      ctx.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+      var w = ctx.measureText(disp).width;
+      if(w > avail && w > 0){
+        fs = Math.floor(fs * avail / w);
+        if(fs < 13) fs = 13;
+        exprBox.style.fontSize = fs + 'px';
+      }
+    }
+  }
+
+  function onUserInput(){
+    updatePreview();
+    autoSize();
+    if(state.mode === 'aggressive') resetAggressiveTimer();
+  }
+
+  /* 激进模式：停顿 aggDelay 毫秒后自动记入历史（不论是否按过 =） */
+  function resetAggressiveTimer(){
+    clearTimeout(aggTimer);
+    aggTimer = setTimeout(function(){
+      aggTimer = null;
+      var expr = currentExpr().trim();
+      if(!expr) return;
+      var v;
+      try{ v = evaluate(expr); }
+      catch(e){ return; }
+      if(typeof v !== 'number' || isNaN(v)) return;
+      addHistory(expr, v);
+      /* 已记录的表达式不再重复计时，直到用户再次输入 */
+    }, state.aggDelay || 10000);
+  }
+
+  function currentResultOrZero(){
+    var expr = currentExpr().trim();
+    if(expr){ try{ return evaluate(expr); }catch(e){} }
+    return state.ans;
+  }
+
+  /* ---------- actions ---------- */
+  function pressEquals(){
+    var expr = currentExpr().trim();
+    if(!expr) return;
+    var v;
+    try{ v = evaluate(expr); }
+    catch(e){
+      resultEl.textContent = '错误';
+      resultEl.classList.add('pulse');
+      setTimeout(function(){ resultEl.classList.remove('pulse'); }, 360);
+      return;
+    }
+    var resStr = formatResult(v);
+    addHistory(expr, v);
+    state.ans = v;
+    save();
+    exprStr = resStr;
+    caretPos = exprStr.length;
+    justEvaluated = true;
+    resultRaw = v;
+    render();
+    updatePreview();
+    autoSize();
+    resultEl.classList.add('pulse');
+    setTimeout(function(){ resultEl.classList.remove('pulse'); }, 360);
+    /* 按 = 时该次计算已记入历史，清掉待触发的激进计时，避免重复记录 */
+    clearTimeout(aggTimer);
+    aggTimer = null;
+  }
+
+  function handleAction(act){
+    switch(act){
+      case 'clear': clearAll(); break;
+      case 'clearEntry': setExpr(''); resultEl.textContent=''; autoSize(); onUserInput(); break;
+      case 'backspace': backspace(); break;
+      case 'paren':
+        insertText(decideParen());
+        break;
+      case 'equals': pressEquals(); break;
+      case 'negate': negate(); break;
+      case 'deg': toggleDeg(); break;
+      case 'memAdd': state.memory += currentResultOrZero(); save(); updateIndicators(); break;
+      case 'memSub': state.memory -= currentResultOrZero(); save(); updateIndicators(); break;
+      case 'memRecall': insertText(formatResult(state.memory)); break;
+      case 'memClear': state.memory = 0; save(); updateIndicators(); break;
+      case 'ans': insertText(formatResult(state.ans)); break;
+    }
+  }
+
+  /* ---------- indicators ---------- */
+  function updateIndicators(){
+    if(state.memory !== 0){ memInd.classList.add('on'); } else { memInd.classList.remove('on'); }
+    degInd.textContent = state.deg ? 'DEG' : 'RAD';
+  }
+
+  function toggleDeg(){
+    state.deg = !state.deg;
+    save();
+    updateIndicators();
+    updatePreview();
+  }
+
+  /* ---------- history ---------- */
+  function addHistory(expr, val){
+    var num = (typeof val === 'number') ? val : null;
+    var last = state.history[0];
+    if(last && last.expr === expr && histNum(last) === num && num !== null) return;
+    var item = {expr:expr, ts:Date.now()};
+    if(num !== null){ item.val = num; }
+    else { item.res = String(val); }
+    state.history.unshift(item);
+    if(state.history.length > state.maxHistory){
+      state.history = state.history.slice(0, state.maxHistory);
+    }
+    save();
+    renderHistory();
+  }
+
+  /* 从历史条目取数值：优先 val，兼容旧版只有 res 字符串的记录 */
+  function histNum(h){
+    if(typeof h.val === 'number') return h.val;
+    if(typeof h.res === 'string'){
+      var s = h.res.trim();
+      /* 旧版记录可能带单位后缀，需按倍率还原（长后缀优先：十亿 > 亿、千万 > 百万 > 万） */
+      for(var i = UNITS.length - 1; i >= 1; i--){
+        var u = UNITS[i];
+        if(s.length > u.label.length && s.slice(-u.label.length) === u.label){
+          var num = parseFloat(s.slice(0, s.length - u.label.length).replace(/,/g,''));
+          if(!isNaN(num)) return num * u.scale;
+        }
+      }
+      var v = parseFloat(s.replace(/[^0-9.eE+-]/g,''));
+      if(!isNaN(v)) return v;
+    }
+    return null;
+  }
+
+  function histText(h){
+    var v = histNum(h);
+    if(v === null) return h.res || '';
+    return formatWithUnit(v);
+  }
+
+  function renderHistory(){
+    historyList.innerHTML = '';
+    histCount.textContent = state.history.length + ' 条';
+    if(state.history.length === 0){
+      var empty = document.createElement('div');
+      empty.className = 'hist-empty';
+      empty.textContent = '暂无历史记录';
+      historyList.appendChild(empty);
+    } else {
+      state.history.forEach(function(h, i){
+        var item = document.createElement('div');
+        item.className = 'hist-item' + (selected[i] ? ' sel' : '');
+        item.setAttribute('data-i', i);
+
+        var box = document.createElement('span');
+        box.className = 'sel-box' + (selected[i] ? ' on' : '');
+
+        var body = document.createElement('div');
+        body.className = 'hist-body';
+        var e = document.createElement('div'); e.className = 'hist-expr'; e.textContent = h.expr;
+        var r = document.createElement('div'); r.className = 'hist-res'; r.textContent = '= ' + histText(h);
+        body.appendChild(e); body.appendChild(r);
+
+        item.appendChild(box); item.appendChild(body);
+        item.addEventListener('click', function(){ onHistClick(i); });
+        historyList.appendChild(item);
+      });
+    }
+    historyList.classList.toggle('selection', selectionMode);
+    drawerFoot.classList.toggle('hidden', !selectionMode);
+    document.getElementById('selToggle').classList.toggle('on', selectionMode);
+    var selCount = Object.keys(selected).length;
+    document.getElementById('deleteSelBtn').textContent = '删除所选' + (selCount ? '(' + selCount + ')' : '');
+  }
+
+  function onHistClick(i){
+    var h = state.history[i];
+    if(selectionMode){
+      if(selected[i]){ delete selected[i]; } else { selected[i] = true; }
+      renderHistory();
+    } else {
+      setExpr(h.expr);
+      resultEl.textContent = '= ' + histText(h);
+      autoSize();
+      closeDrawer();
+    }
+  }
+
+  function toggleSelection(){
+    selectionMode = !selectionMode;
+    if(!selectionMode) selected = {};
+    renderHistory();
+  }
+
+  function selectAll(){
+    state.history.forEach(function(_, i){ selected[i] = true; });
+    renderHistory();
+  }
+
+  function deleteSelected(){
+    var keys = Object.keys(selected);
+    if(keys.length === 0) return;
+    var keep = [];
+    state.history.forEach(function(h, i){ if(!selected[i]) keep.push(h); });
+    state.history = keep;
+    selected = {};
+    save();
+    renderHistory();
+  }
+
+  function clearAllHistory(){
+    if(state.history.length === 0) return;
+    showConfirm('确定要清空全部 ' + state.history.length + ' 条历史记录吗？此操作不可撤销。', function(){
+      state.history = [];
+      selected = {};
+      save();
+      renderHistory();
+    });
+  }
+
+  /* ---------- drawer / modal ---------- */
+  function openDrawer(){
+    drawer.classList.add('show');
+    backdrop.classList.add('show');
+  }
+  function closeDrawer(){
+    drawer.classList.remove('show');
+    backdrop.classList.remove('show');
+  }
+  function openModal(id){ document.getElementById(id).classList.add('show'); }
+  function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+
+  function showConfirm(msg, cb){
+    document.getElementById('confirmMsg').textContent = msg;
+    confirmCb = cb;
+    openModal('confirmModal');
+  }
+
+  /* ---------- theme ---------- */
+  function setTheme(t){
+    state.theme = t;
+    document.documentElement.setAttribute('data-theme', t);
+    document.getElementById('themeSun').classList.toggle('hidden', t === 'dark');
+    document.getElementById('themeMoon').classList.toggle('hidden', t !== 'dark');
+    save();
+  }
+
+  /* ---------- mode ---------- */
+  function setMode(m){
+    state.mode = m;
+    document.querySelectorAll('#histSeg button').forEach(function(b){
+      b.classList.toggle('on', b.dataset.mode === m);
+    });
+    clearTimeout(aggTimer);
+    aggTimer = null;
+    if(m === 'aggressive' && currentExpr().trim()) resetAggressiveTimer();
+    save();
+  }
+
+  function setCalcMode(cm){
+    state.calcMode = cm;
+    document.querySelectorAll('#calcSeg button').forEach(function(b){
+      b.classList.toggle('on', b.dataset.cm === cm);
+    });
+    applyCalcMode();
+    save();
+  }
+
+  function applyCalcMode(){
+    var sci = (state.calcMode === 'sci');
+    document.getElementById('gridSci').style.display = sci ? '' : 'none';
+    document.getElementById('gridSimple').style.display = sci ? 'none' : '';
+    document.getElementById('indicators').style.display = sci ? '' : 'none';
+  }
+
+  /* ---------- wire events ---------- */
+  document.getElementById('keypad').addEventListener('click', function(ev){
+    var btn = ev.target.closest('button');
+    if(!btn) return;
+    if(btn.dataset.ins != null){ insertText(btn.dataset.ins); }
+    else if(btn.dataset.act){ handleAction(btn.dataset.act); }
+  });
+
+  /* 显示区内的退格键（不在 keypad 容器内，单独绑定） */
+  document.querySelector('.backspace-btn').addEventListener('click', function(){
+    if(justEvaluated && state.unit !== 0 && resultRaw !== null) return;
+    backspace();
+  });
+
+  /* ---------- toast / clipboard ---------- */
+  var toastEl = document.getElementById('toast');
+  var toastTimer = null;
+  function showToast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ toastEl.classList.remove('show'); }, 2500);
+  }
+  function copyText(text){
+    /* Capacitor 原生剪贴板（最可靠，不受手势上下文限制） */
+    var Cap = window.Capacitor;
+    if(Cap && Cap.Plugins && Cap.Plugins.Clipboard && Cap.Plugins.Clipboard.write){
+      Cap.Plugins.Clipboard.write({string:text}).then(function(){
+        showToast('公式已复制');
+      }).catch(function(){ webCopy(text); });
+      return;
+    }
+    webCopy(text);
+
+    function webCopy(t){
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(t).then(function(){
+          showToast('公式已复制');
+        }).catch(function(){ fallbackCopy(t); });
+      } else {
+        fallbackCopy(t);
+      }
+    }
+    function fallbackCopy(t){
+      try{
+        var ta = document.createElement('textarea');
+        ta.value = t;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        var ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast(ok ? '公式已复制' : '复制失败');
+      }catch(e){ showToast('复制失败'); }
+    }
+  }
+
+  /* 长按表达式复制（复制原始串，不含千分位逗号）
+     Android WebView 的长按会弹出系统原生"复制"菜单，无法用 CSS 压制。
+     故双管齐下：① 劫持 copy 事件（用户点系统菜单"复制"时写入原始串）
+                 ② 自定义短按计时器（作为无系统菜单时的兜底） */
+  /* 系统原生"复制"菜单触发的 copy 事件目标可能是 document，
+     故在 document 级劫持：若选区落在表达式内，替换为原始公式串 */
+  document.addEventListener('copy', function(e){
+    if(!exprStr) return;
+    var sel = (window.getSelection && window.getSelection().toString()) || '';
+    if(!sel) return;
+    var disp = formatExprDisplay(exprStr);
+    /* 选区是显示串的一部分（千分位显示），或光标在表达式内 → 视为复制公式 */
+    if(disp.indexOf(sel) >= 0 || sel.indexOf(sel) >= 0){
+      if(e.clipboardData){
+        try{ e.clipboardData.setData('text/plain', exprStr); e.preventDefault(); }catch(err){}
+      }
+      showToast('公式已复制');
+    }
+  });
+
+  var longPressTimer = null;
+  var suppressClick = false;
+  exprBox.addEventListener('touchstart', function(e){
+    if(!exprStr) return;
+    var text = exprStr;
+    longPressTimer = setTimeout(function(){
+      suppressClick = true;
+      if(navigator.vibrate) navigator.vibrate(20);
+      copyText(text);
+    }, 450);
+  }, {passive:true});
+  function cancelLongPress(){ clearTimeout(longPressTimer); }
+  exprBox.addEventListener('touchend', cancelLongPress);
+  exprBox.addEventListener('touchmove', cancelLongPress);
+  exprBox.addEventListener('touchcancel', cancelLongPress);
+  exprBox.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+
+  exprBox.addEventListener('click', function(e){
+    if(suppressClick){ suppressClick = false; return; }
+    if(justEvaluated && state.unit !== 0 && resultRaw !== null) return; /* 单位态只读 */
+    var rect = exprBox.getBoundingClientRect();
+    var dp = posFromX(e.clientX - rect.left);
+    caretPos = toRawPos(dp);
+    render();
+  });
+
+  degInd.addEventListener('click', toggleDeg);
+
+  var unitPicker = document.getElementById('unitPicker');
+  var unitTrigger = document.getElementById('unitTrigger');
+  var unitLabel = document.getElementById('unitLabel');
+  var unitMenu = document.getElementById('unitMenu');
+
+  function applyUnit(v){
+    if(isNaN(v) || v < 0 || v >= UNITS.length) v = 0;
+    state.unit = v;
+    unitLabel.textContent = UNITS[v].label;
+    Array.prototype.forEach.call(unitMenu.children, function(c){
+      c.classList.toggle('sel', c.getAttribute('data-i') === String(v));
+    });
+    save();
+    render();        /* 结果态主显示区随单位换算 */
+    updatePreview();
+    autoSize();
+    renderHistory(); /* 历史结果随单位实时换算 */
+  }
+  UNITS.forEach(function(u, i){
+    var opt = document.createElement('div');
+    opt.className = 'unit-opt' + (i === state.unit ? ' sel' : '');
+    opt.setAttribute('data-i', i);
+    var t = document.createElement('span'); t.textContent = u.label;
+    var tick = document.createElement('span'); tick.className = 'tick'; tick.textContent = '✓';
+    opt.appendChild(t); opt.appendChild(tick);
+    opt.addEventListener('click', function(e){
+      e.stopPropagation();
+      applyUnit(i);
+      unitPicker.classList.remove('open');
+    });
+    unitMenu.appendChild(opt);
+  });
+  unitLabel.textContent = UNITS[state.unit].label;
+  unitTrigger.addEventListener('click', function(e){
+    e.stopPropagation();
+    unitPicker.classList.toggle('open');
+  });
+  document.addEventListener('click', function(){
+    unitPicker.classList.remove('open');
+  });
+
+  document.addEventListener('keydown', function(e){
+    var el = document.activeElement;
+    if(el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return;
+    var k = e.key;
+    if(/^[0-9]$/.test(k)){ e.preventDefault(); insertText(k); }
+    else if(k === '.'){ e.preventDefault(); insertText('.'); }
+    else if(k === '+'){ e.preventDefault(); insertText('+'); }
+    else if(k === '-'){ e.preventDefault(); insertText('−'); }
+    else if(k === '*'){ e.preventDefault(); insertText('×'); }
+    else if(k === '/'){ e.preventDefault(); insertText('÷'); }
+    else if(k === '^'){ e.preventDefault(); insertText('^'); }
+    else if(k === '('){ e.preventDefault(); insertText('('); }
+    else if(k === ')'){ e.preventDefault(); insertText(')'); }
+    else if(k === '%'){ e.preventDefault(); insertText('%'); }
+    else if(k === '!'){ e.preventDefault(); insertText('!'); }
+    else if(k === 'Enter' || k === '='){ e.preventDefault(); pressEquals(); }
+    else if(k === 'Backspace'){ e.preventDefault(); backspace(); }
+    else if(k === 'Escape'){ e.preventDefault(); clearAll(); }
+    else if(k === 'ArrowLeft'){ e.preventDefault(); if(caretPos > 0){ caretPos -= 1; render(); } }
+    else if(k === 'ArrowRight'){ e.preventDefault(); if(caretPos < exprStr.length){ caretPos += 1; render(); } }
+    else if(k === 'Home'){ e.preventDefault(); caretPos = 0; render(); }
+    else if(k === 'End'){ e.preventDefault(); caretPos = exprStr.length; render(); }
+    else if(k === 'p' || k === 'P'){ e.preventDefault(); insertText('π'); }
+    else if(k === 'e' && !e.ctrlKey && !e.metaKey){ e.preventDefault(); insertText('e'); }
+  });
+
+  document.getElementById('themeBtn').addEventListener('click', function(){
+    setTheme(state.theme === 'eink' ? 'dark' : 'eink');
+  });
+  document.getElementById('historyBtn').addEventListener('click', openDrawer);
+  document.getElementById('settingsBtn').addEventListener('click', function(){
+    document.getElementById('maxHistInput').value = state.maxHistory;
+    document.getElementById('aggDelayInput').value = (state.aggDelay / 1000);
+    openModal('settingsModal');
+  });
+  backdrop.addEventListener('click', closeDrawer);
+
+  document.getElementById('histSeg').addEventListener('click', function(e){
+    var b = e.target.closest('button'); if(!b) return;
+    setMode(b.dataset.mode);
+  });
+  document.getElementById('calcSeg').addEventListener('click', function(e){
+    var b = e.target.closest('button'); if(!b) return;
+    setCalcMode(b.dataset.cm);
+  });
+
+  document.getElementById('selToggle').addEventListener('click', toggleSelection);
+  document.getElementById('selectAllBtn').addEventListener('click', selectAll);
+  document.getElementById('deleteSelBtn').addEventListener('click', deleteSelected);
+  document.getElementById('cancelSelBtn').addEventListener('click', toggleSelection);
+  document.getElementById('clearAllBtn').addEventListener('click', clearAllHistory);
+
+  document.getElementById('settingsClose').addEventListener('click', function(){ closeModal('settingsModal'); });
+  document.getElementById('settingsSave').addEventListener('click', function(){
+    var v = parseInt(document.getElementById('maxHistInput').value, 10);
+    if(!isFinite(v) || v < 1) v = 1;
+    if(v > 1000) v = 1000;
+    state.maxHistory = v;
+    if(state.history.length > v) state.history = state.history.slice(0, v);
+    var d = parseFloat(document.getElementById('aggDelayInput').value);
+    if(!isFinite(d) || d < 0.3) d = 0.3;
+    if(d > 120) d = 120;
+    state.aggDelay = Math.round(d * 1000);
+    save();
+    renderHistory();
+    closeModal('settingsModal');
+  });
+
+  document.getElementById('confirmCancel').addEventListener('click', function(){ closeModal('confirmModal'); });
+  document.getElementById('confirmOk').addEventListener('click', function(){
+    closeModal('confirmModal');
+    if(confirmCb){ var cb = confirmCb; confirmCb = null; cb(); }
+  });
+
+  /* ---------- init ---------- */
+  setTheme(state.theme);
+  setMode(state.mode);
+  setCalcMode(state.calcMode);
+  updateIndicators();
+  renderHistory();
+  autoSize();
+  render();
+})();
+</script>
+</body>
+</html>
