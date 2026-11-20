@@ -1,6 +1,6 @@
 # Ink Calculator · 墨水屏计算器
 
-> 一款墨水屏风格的开源 Android 计算器 App：可光标级编辑表达式、本地计算历史、千/万/亿显示单位换算、智能括号与长按复制公式。单文件 HTML + Capacitor 打包，无后端、零网络请求。MIT 协议。
+> 一款墨水屏风格的开源 Android 计算器 App。起因：系统自带计算器不能在输入框定位光标；找到符合要求的又有广告，且国内无法购买会员；于是作者自己做了一个，把想要的功能都加上，UI 按自己喜欢的来。支持光标级编辑表达式、本地计算历史、千/万/亿单位换算、智能括号与长按复制。单文件 HTML + Capacitor 打包，无后端、零网络请求、无广告，MIT 协议。
 
 - 仓库：https://github.com/benyichan/ink-calculator
 - 落地页：https://benyichan.github.io/ink-calculator/

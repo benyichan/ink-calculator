@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ink Calculator — 把计算器做成一张纸</title>
-<meta name="description" content="Ink Calculator 是一款墨水屏风格的 Android 计算器：克制的设计、可光标级编辑的表达式、懂上下文的括号、本地计算历史与单位换算。为一个不想被打扰的计算时刻而做。">
+<meta name="description" content="Ink Calculator 起因于一个抱怨：系统计算器不能定位光标，好用的又有广告、国内买不了会员。于是自己做了一个——墨水屏风格、无广告、可光标编辑表达式、本地历史与单位换算，MIT 开源。">
 <link rel="canonical" href="https://benyichan.github.io/ink-calculator/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Ink Calculator — 把计算器做成一张纸">
-<meta property="og:description" content="少一点花哨，多一点安静。一个为认真算数的人做的计算器。">
+<meta property="og:description" content="系统计算器不能定位光标，好用的又有广告。索性自己做了一个——墨水屏风格，无广告，MIT 开源。">
 <meta property="og:url" content="https://benyichan.github.io/ink-calculator/">
 <meta property="og:image" content="https://benyichan.github.io/ink-calculator/assets/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -78,9 +78,12 @@ nav a:hover{color:var(--ink);}
 .manifesto .quote{font-family:var(--serif);font-size:34px;line-height:1.65;max-width:860px;letter-spacing:-.3px;}
 .manifesto .quote em{font-style:normal;background:linear-gradient(transparent 62%,var(--fn) 62%);}
 .manifesto .attr{margin-top:30px;font-family:var(--mono);font-size:12px;color:var(--soft);letter-spacing:1px;}
-.manifesto .cols{display:grid;grid-template-columns:repeat(3,1fr);gap:40px;margin-top:64px;padding-top:44px;border-top:1px solid var(--line);}
-.manifesto .col h3{font-family:var(--serif);font-size:19px;margin-bottom:10px;}
-.manifesto .col p{font-size:13.5px;color:var(--soft);line-height:1.85;}
+.manifesto .storyline{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:56px;padding-top:44px;border-top:1px solid var(--line);}
+.manifesto .step{padding:0 32px;border-left:1px solid var(--line);}
+.manifesto .step:first-child{padding-left:0;border-left:none;}
+.manifesto .step .sn{font-family:var(--mono);font-size:12px;color:var(--soft);letter-spacing:2px;display:block;margin-bottom:14px;}
+.manifesto .step p{font-size:14px;line-height:1.9;color:var(--soft);}
+.manifesto .step b{color:var(--ink);font-weight:600;}
 
 /* design language */
 .design{background:var(--display);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:92px 0;}
@@ -157,7 +160,9 @@ footer{border-top:1px solid var(--line);padding:36px 0 56px;}
   nav a:not(.nav-dl){display:none;}
   .hero h1{font-size:38px;}
   .manifesto .quote{font-size:25px;}
-  .manifesto .cols{grid-template-columns:1fr;gap:24px;}
+  .manifesto .storyline{grid-template-columns:1fr;gap:26px;}
+  .manifesto .step{padding:0 0 0 20px;border-left:2px solid var(--line);}
+  .manifesto .step:first-child{padding-left:20px;border-left:2px solid var(--line);}
   .design-grid,.story{padding:64px 0;}
   h2.big{font-size:31px;}
   .story h3{font-size:28px;}
@@ -188,7 +193,7 @@ footer{border-top:1px solid var(--line);padding:36px 0 56px;}
     <div>
       <div class="kicker">AN E-INK CALCULATOR FOR ANDROID</div>
       <h1><span>把计算器，</span><span>做成一张<span class="underline">纸</span>。</span></h1>
-      <p class="lead">没有跳动的广告，没有花哨的渐变，没有学不会的功能。<strong>只有一个安静、趁手、算得准的计算器</strong>——像随手撕下一张纸那样自然。</p>
+      <p class="lead">始于一个很实际的抱怨：系统计算器不能定位光标，好用的又要看广告、国内还买不了会员。<strong>索性自己做一个</strong>——没有广告、没有付费墙，把想要的功能都加上，UI 照自己喜欢的来。</p>
       <div class="actions">
         <a class="btn btn-solid" href="apk/ink-calculator-v1.5.apk">↓ 装到手机</a>
         <a class="btn btn-line" href="app/index.html" target="_blank">在浏览器试试 ↗</a>
@@ -207,14 +212,14 @@ footer{border-top:1px solid var(--line);padding:36px 0 56px;}
 
 <section class="manifesto" id="why">
   <div class="wrap">
-    <div class="kicker">01 / WHY</div>
-    <div class="quote">我们每天用它算工资、算折扣、算房贷、算<em>这顿饭谁请</em>。<br>可大多数计算器，都在抢你的注意力。</div>
-    <div class="attr">— 于是做了这个，只为那一个认真算数的瞬间</div>
-    <div class="cols">
-      <div class="col"><h3>它应该安静</h3><p>打开就是纸色和细线，没有欢迎页、没有推荐位。你的眼睛只需要落在数字上。</p></div>
-      <div class="col"><h3>它应该听话</h3><p>算到一半发现写错了？点一下就能改。括号、百分号、单位，都按你习惯的方式工作。</p></div>
-      <div class="col"><h3>它应该记住</h3><p>刚才那笔数是多少？历史就在那里，不上传、不联网，只留在你自己的手机里。</p></div>
+    <div class="kicker">01 / WHY — 一个自用工具的故事</div>
+    <div class="quote">一开始，我只是想要一个<em>能在公式里定位光标</em>的计算器。<br>找了一圈，才发现这事没那么简单。</div>
+    <div class="storyline">
+      <div class="step"><span class="sn">01</span><p><b>系统自带的计算器</b>，用着顺手，但输入框不能定位光标——写错了只能从头再来。</p></div>
+      <div class="step"><span class="sn">02</span><p>终于找到符合要求的计算器，<b>打开先弹广告</b>。想花钱买个清净，<b>国内还买不了会员</b>。</p></div>
+      <div class="step"><span class="sn">03</span><p>索性自己做一个。<b>把想要的功能都加上</b>，UI 也按自己喜欢的来——于是有了这个墨水屏计算器。</p></div>
     </div>
+    <div class="attr">— 从一次抱怨，到一个每天都在用的 App</div>
   </div>
 </section>
 
@@ -224,7 +229,7 @@ footer{border-top:1px solid var(--line);padding:36px 0 56px;}
       <div>
         <div class="kicker">02 / DESIGN LANGUAGE</div>
         <h2 class="big">墨水屏，<br>是一种克制。</h2>
-        <p class="desc">纸白、浅灰、深灰、墨黑。没有一种颜色是为了好看而存在，每一种都在说明「这是什么」。按键是细线描边的方块，按下时会轻轻下沉——像真的按在一张纸上。</p>
+        <p class="desc">既然是自己用，UI 就照自己喜欢的来。纸白、浅灰、深灰、墨黑——像一张真的纸。没有一种颜色是为了好看而存在，每一种都在说明「这是什么」。按键是细线描边的方块，按下时轻轻下沉，像真的按在纸上。</p>
         <div class="swatches">
           <div class="sw" style="background:#e9e8e3;color:#6f6f66;">#e9e8e3</div>
           <div class="sw" style="background:#f4f3ec;color:#6f6f66;">#f4f3ec</div>
@@ -347,7 +352,7 @@ footer{border-top:1px solid var(--line);padding:36px 0 56px;}
 <section class="final">
   <div class="wrap">
     <h2>下次算数，<br>让它安静一点。</h2>
-    <p>免费、开源、完全离线。装上去用用看，不喜欢随时删掉。</p>
+    <p>一开始只是想解决自己的抱怨，没想到顺手把想要的功能都做齐了。<br>免费、开源、没有广告。装上去试试，不喜欢随时删掉。</p>
     <div class="actions">
       <a class="btn btn-solid" href="apk/ink-calculator-v1.5.apk">↓ 下载 APK</a>
       <a class="btn btn-line" href="https://github.com/benyichan/ink-calculator" target="_blank">看看源码 ↗</a>
