@@ -2,7 +2,7 @@
 
 # Ink Calculator · 墨水屏计算器
 
-**把计算器做成一张纸。**
+**别人不做的，我做。**
 
 [![GitHub Pages](https://img.shields.io/badge/落地页-GitHub%20Pages-20201e?style=flat-square)](https://benyichan.github.io/ink-calculator/)
 [![License: MIT](https://img.shields.io/badge/协议-MIT-20201e?style=flat-square)](LICENSE)
