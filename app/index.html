@@ -500,6 +500,7 @@
     ans: 0,
     calcMode: 'simple',
     unit: 0,
+    unitV: 1,
     aggDelay: 10000,
     aggV: 3
   };
@@ -514,7 +515,13 @@
         if(typeof out.maxHistory !== 'number' || out.maxHistory < 1 || out.maxHistory > 1000) out.maxHistory = 30;
         if(out.mode !== 'aggressive') out.mode = 'normal';
         if(out.calcMode !== 'sci') out.calcMode = 'simple';
-        if(typeof out.unit !== 'number' || out.unit < 0 || out.unit > 6) out.unit = 0;
+        /* 一次性迁移：v1.7 插入「十万」后，旧 unit 下标整体后移一位 */
+        if(d.unitV !== 1){
+          var LEGACY_UNIT = [0,1,2,4,5,6,7];
+          if(typeof out.unit === 'number' && out.unit >= 0 && out.unit <= 6) out.unit = LEGACY_UNIT[out.unit];
+          out.unitV = 1;
+        }
+        if(typeof out.unit !== 'number' || out.unit < 0 || out.unit > 7) out.unit = 0;
         if(typeof out.aggDelay !== 'number' || out.aggDelay < 300 || out.aggDelay > 120000) out.aggDelay = 10000;
         /* 一次性迁移：升级到新默认 10s（用户明确要求） */
         if(out.aggV !== 3){ out.aggDelay = 10000; out.aggV = 3; }
@@ -970,11 +977,12 @@
     return count;
   }
 
-  /* 显示单位切换：原值/千/万/百万/千万/亿/十亿 */
+  /* 显示单位切换：原值/千/万/十万/百万/千万/亿/十亿 */
   var UNITS = [
     {label:'原值', scale:1},
     {label:'千', scale:1e3},
     {label:'万', scale:1e4},
+    {label:'十万', scale:1e5},
     {label:'百万', scale:1e6},
     {label:'千万', scale:1e7},
     {label:'亿', scale:1e8},
@@ -1385,7 +1393,7 @@
     if(typeof h.val === 'number') return h.val;
     if(typeof h.res === 'string'){
       var s = h.res.trim();
-      /* 旧版记录可能带单位后缀，需按倍率还原（长后缀优先：十亿 > 亿、千万 > 百万 > 万） */
+      /* 旧版记录可能带单位后缀，需按倍率还原（长后缀优先：十亿 > 亿 > 千万 > 百万 > 十万 > 万） */
       for(var i = UNITS.length - 1; i >= 1; i--){
         var u = UNITS[i];
         if(s.length > u.label.length && s.slice(-u.label.length) === u.label){

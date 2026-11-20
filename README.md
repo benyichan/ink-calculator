@@ -8,7 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/协议-MIT-20201e?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/平台-Android%207%2B-20201e?style=flat-square)](https://github.com/benyichan/ink-calculator/releases)
 
-[**🌐 产品介绍落地页**](https://benyichan.github.io/ink-calculator/) · [**📱 下载 APK v1.6**](apk/ink-calculator-v1.6.apk) · [**▶️ 浏览器在线体验**](https://benyichan.github.io/ink-calculator/app/index.html)
+[**🌐 产品介绍落地页**](https://benyichan.github.io/ink-calculator/) · [**📱 下载 APK v1.7**](apk/ink-calculator-v1.7.apk) · [**▶️ 浏览器在线体验**](https://benyichan.github.io/ink-calculator/app/index.html)
 
 ![screenshot](assets/screenshot.png)
 
@@ -28,7 +28,7 @@
 - **光标级编辑**：表达式任意位置插入/删除数字与运算符，点击定位光标，实时千分位显示
 - **智能括号**：单个 `()` 键自动判断插入左括号 / 右括号，连续输入按同向处理（复合公式），运算完成自动跳出
 - **计算历史**：平常（按 `=` 才记录）/ 激进（停顿可配置，默认 10 秒自动记录）双模式，默认保留 30 条，多选删除 + 一键清空
-- **显示单位**：原值 / 千 / 万 / 百万 / 千万 / 亿 / 十亿，结果态整体换算，历史记录实时重算
+- **显示单位**：原值 / 千 / 万 / 十万 / 百万 / 千万 / 亿 / 十亿，结果态整体换算，历史记录实时重算
 - **科学模式**：三角函数、对数、幂、开方、阶乘、DEG/RAD、记忆功能
 - **贴心细节**：超长公式自动缩字号完整显示、零过多自动科学计数法、CASIO 式上下文百分号（`100-12.5% = 87.5`）、长按公式复制到剪贴板
 
@@ -36,7 +36,7 @@
 
 | 方式 | 入口 | 说明 |
 |---|---|---|
-| 📱 Android APK | [apk/ink-calculator-v1.6.apk](apk/ink-calculator-v1.6.apk) · [Releases](https://github.com/benyichan/ink-calculator/releases) | 自签名 release，Android 7.0 / API 24+，首次安装需允许「未知来源」 |
+| 📱 Android APK | [apk/ink-calculator-v1.7.apk](apk/ink-calculator-v1.7.apk) · [Releases](https://github.com/benyichan/ink-calculator/releases) | 自签名 release，Android 7.0 / API 24+，首次安装需允许「未知来源」 |
 | ▶️ 浏览器版 | [在线打开](https://benyichan.github.io/ink-calculator/app/index.html) 或本地 [app/index.html](app/index.html) | 单文件、零依赖、离线可用，与 APK 界面源码完全一致 |
 | 🌐 产品介绍 | [落地页](https://benyichan.github.io/ink-calculator/) |缘起、设计理念、体验演示、为谁而做 |
 
@@ -82,6 +82,7 @@ cd android
 - **幂运算**：右结合；`-2^2 = -4`，`(-2)^2 = 4`，`2^-3 = 0.125`；`0^0 = 1`（与 `Math.pow` 一致），负指数按倒数处理。
 - **百分号**：`A+B% = A + A×B/100`，`A*B% = A×(B/100)`；括号结果后接 `%` 视为普通值（`(20+10)% = 0.3`），不触发上下文百分号。
 - **安全上限**：表达式 500 字符 / 200 token / 解析深度 80 / 阶乘 ≤ 170；超限返回错误码，不卡死、不栈溢出。
+- **单位兼容**：v1.7 新增「十万」档；旧版本已保存的单位选择会自动迁移到新下标，历史记录中的带单位字符串按后缀还原。
 - **错误态**：计算核心返回 `{ok, value, code, message}`，UI 不直接接异常；`NaN / Infinity` 一律显示「无效」，不写入历史。
 - **已知限制**：`1/3` 显示为 12 位有效数字的近似值；超过 `2^53` 的大整数会精度下降；需要精确十进制的场景请用专用工具。
 
