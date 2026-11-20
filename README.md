@@ -8,7 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/协议-MIT-20201e?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/平台-Android%207%2B-20201e?style=flat-square)](https://github.com/benyichan/ink-calculator/releases)
 
-[**🌐 产品介绍落地页**](https://benyichan.github.io/ink-calculator/) · [**📱 下载 APK v1.5**](apk/ink-calculator-v1.5.apk) · [**▶️ 浏览器在线体验**](https://benyichan.github.io/ink-calculator/app/index.html)
+[**🌐 产品介绍落地页**](https://benyichan.github.io/ink-calculator/) · [**📱 下载 APK v1.6**](apk/ink-calculator-v1.6.apk) · [**▶️ 浏览器在线体验**](https://benyichan.github.io/ink-calculator/app/index.html)
 
 ![screenshot](assets/screenshot.png)
 
@@ -36,7 +36,7 @@
 
 | 方式 | 入口 | 说明 |
 |---|---|---|
-| 📱 Android APK | [apk/ink-calculator-v1.5.apk](apk/ink-calculator-v1.5.apk) · [Releases](https://github.com/benyichan/ink-calculator/releases) | 自签名 release，Android 7.0 / API 24+，首次安装需允许「未知来源」 |
+| 📱 Android APK | [apk/ink-calculator-v1.6.apk](apk/ink-calculator-v1.6.apk) · [Releases](https://github.com/benyichan/ink-calculator/releases) | 自签名 release，Android 7.0 / API 24+，首次安装需允许「未知来源」 |
 | ▶️ 浏览器版 | [在线打开](https://benyichan.github.io/ink-calculator/app/index.html) 或本地 [app/index.html](app/index.html) | 单文件、零依赖、离线可用，与 APK 界面源码完全一致 |
 | 🌐 产品介绍 | [落地页](https://benyichan.github.io/ink-calculator/) |缘起、设计理念、体验演示、为谁而做 |
 
@@ -73,6 +73,25 @@ cd android
 - 自绘光标替代原生 `<input>`，规避 Android WebView 唤起软键盘的问题
 - 千分位仅为显示层改写，内部始终保存原始串；光标位置通过双向位置映射保持准确
 - 剪贴板使用 `@capacitor/clipboard` 原生插件，规避 WebView 中 `execCommand` 在长按定时器内失效的问题
+
+### 数值策略与语义约定
+
+- **数值内核**：JavaScript IEEE-754 双精度。不是精确十进制 / 有理数内核，不做「1÷3×3 严格等于 1」的精确承诺。
+- **展示归一**：仅展示层按 12 位有效数字归一（`0.1+0.2 → 0.3`，`1.005×100 → 100.5`），中间值不用 `toFixed` 修正。
+- **容差**：`1e-12` 只用于 `sqrt / log / asin / acos / tan` 的定义域边界判断；除零按 `b === 0` 精确判断，`1/0` 报「不能除以零」。
+- **幂运算**：右结合；`-2^2 = -4`，`(-2)^2 = 4`，`2^-3 = 0.125`；`0^0 = 1`（与 `Math.pow` 一致），负指数按倒数处理。
+- **百分号**：`A+B% = A + A×B/100`，`A*B% = A×(B/100)`；括号结果后接 `%` 视为普通值（`(20+10)% = 0.3`），不触发上下文百分号。
+- **安全上限**：表达式 500 字符 / 200 token / 解析深度 80 / 阶乘 ≤ 170；超限返回错误码，不卡死、不栈溢出。
+- **错误态**：计算核心返回 `{ok, value, code, message}`，UI 不直接接异常；`NaN / Infinity` 一律显示「无效」，不写入历史。
+- **已知限制**：`1/3` 显示为 12 位有效数字的近似值；超过 `2^53` 的大整数会精度下降；需要精确十进制的场景请用专用工具。
+
+### 测试
+
+```bash
+node --test tests/calc-core.test.js
+```
+
+覆盖 206 条黄金用例、1000 条随机属性测试、500 条模糊输入测试，以及每个已修 BUG 的具名回归用例。依赖安全扫描：`npm audit --registry=https://registry.npmjs.org --omit=dev` → 0 个漏洞（Critical / High / Moderate / Low 均为 0）。
 
 ## 协议
 

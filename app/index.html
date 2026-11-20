@@ -203,6 +203,7 @@
     transition:opacity .2s ease,transform .2s ease;
   }
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  #result.error{color:var(--accent);font-weight:600;}
   #result.pulse{animation:pulse .35s ease;}
   @keyframes pulse{45%{color:var(--accent);}}
 
@@ -308,6 +309,23 @@
   @media (min-width:481px){
     body{display:flex;align-items:center;justify-content:center;padding:24px;}
     .app{height:min(92vh,860px);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);background:var(--paper);}
+  }
+  /* 横屏矮屏：两栏布局，左侧显示区 + 右侧键盘，避免按键被裁剪 */
+  @media (orientation:landscape) and (max-height:600px){
+    body{display:block;padding:0;}
+    .app{
+      max-width:none;height:100dvh;border:none;border-radius:0;box-shadow:none;background:transparent;
+      padding:8px 12px;gap:8px;
+      display:grid;grid-template-columns:minmax(220px,32%) 1fr;
+      grid-template-rows:auto auto 1fr;
+      grid-template-areas:"top keys" "mode keys" "disp keys";
+    }
+    .topbar{grid-area:top;}
+    .modebar{grid-area:mode;}
+    .display{grid-area:disp;min-height:0;padding:10px 12px;}
+    .keypad{grid-area:keys;min-height:0;}
+    .grid{gap:6px;}
+    #expr{min-height:36px;}
   }
 </style>
 </head>
@@ -502,6 +520,9 @@
         if(out.aggV !== 3){ out.aggDelay = 10000; out.aggV = 3; }
         if(out.theme !== 'dark' && out.theme !== 'eink') out.theme = 'eink';
         if(!Array.isArray(out.history)) out.history = [];
+        out.history = out.history.filter(function(h){
+          return h && typeof h.expr === 'string';
+        }).slice(0, out.maxHistory);
         return out;
       }
     }catch(e){}
@@ -532,11 +553,74 @@
   var aggTimer = null;
   var confirmCb = null;
 
+  /* ==== CALC CORE START ==== */
   /* ---------- tokenizer & parser ---------- */
+  /* 数值策略：IEEE-754 双精度；仅在展示层做 12 位有效数字归一，
+     容差用于定义域边界判断，不用于篡改中间计算结果。 */
+  var NUMERIC = {
+    DISPLAY_SIG: 12,
+    SCI_HIGH: 1e15,
+    SCI_LOW: 1e-9,
+    TOL: 1e-12,
+    MAX_EXPR_LEN: 500,
+    MAX_TOKENS: 200,
+    MAX_DEPTH: 80,
+    MAX_FACTORIAL: 170
+  };
+  var ERR_MSG = {
+    E_EMPTY: '请输入表达式',
+    E_SYNTAX: '表达式格式错误',
+    E_NUM: '数字格式错误',
+    E_BAD_CHAR: '包含无法识别的字符',
+    E_UNKNOWN_FUNC: '未知函数',
+    E_PAREN: '括号不匹配',
+    E_EMPTY_PAREN: '括号内不能为空',
+    E_EXTRA_PAREN: '多余的右括号',
+    E_MISSING_PAREN: '缺少右括号',
+    E_DIV_ZERO: '不能除以零',
+    E_DOMAIN: '超出函数定义域',
+    E_UNDEFINED: '此处无定义',
+    E_FACTORIAL: '阶乘需要非负整数',
+    E_TOO_LARGE: '数值过大',
+    E_TOO_SMALL: '数值太小，已下溢',
+    E_OVERFLOW: '结果超出可表示范围',
+    E_TOO_COMPLEX: '表达式过长或过于复杂'
+  };
+  function fail(code, message, pos){
+    var e = new Error(message || ERR_MSG[code] || '计算错误');
+    e.code = code;
+    if(pos != null) e.pos = pos;
+    throw e;
+  }
+  function calcErr(code, message, pos){
+    return {ok:false, code:code, message:message || ERR_MSG[code] || '计算错误', pos:(pos == null ? null : pos)};
+  }
+  function ensureFinite(v, pos){ if(!isFinite(v)) fail('E_OVERFLOW', null, pos); return v; }
+  function mulChecked(a, b, pos){
+    var r = a * b;
+    if(!isFinite(r)) fail('E_OVERFLOW', null, pos);
+    if(r === 0 && a !== 0 && b !== 0) fail('E_TOO_SMALL', null, pos);
+    return r;
+  }
+  function divChecked(a, b, pos){
+    if(b === 0) fail('E_DIV_ZERO', null, pos);
+    var r = a / b;
+    if(!isFinite(r)) fail('E_OVERFLOW', null, pos);
+    if(r === 0 && a !== 0 && b !== 0) fail('E_TOO_SMALL', null, pos);
+    return r;
+  }
+  function addChecked(a, b, pos){
+    var r = a + b;
+    if(!isFinite(r)) fail('E_OVERFLOW', null, pos);
+    return r;
+  }
+
   var FUNCS = ['asin','acos','atan','sinh','cosh','tanh','sqrt','cbrt','floor','ceil','round','sin','cos','tan','log','ln','abs','exp'];
 
   function tokenize(expr){
-    var s = String(expr).replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-').replace(/π/g,'pi');
+    var s = String(expr == null ? '' : expr);
+    if(s.length > NUMERIC.MAX_EXPR_LEN) fail('E_TOO_COMPLEX', null, 0);
+    s = s.replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-').replace(/π/g,'pi');
     var tokens = [];
     var i = 0, n = s.length;
     while(i < n){
@@ -545,184 +629,285 @@
       if(/[0-9.]/.test(c)){
         var j = i, dots = 0;
         while(j < n && (/[0-9]/.test(s[j]) || s[j] === '.')){ if(s[j] === '.') dots++; j++; }
-        if(dots > 1) throw new Error('数字格式错误');
-        tokens.push({type:'num', value:parseFloat(s.slice(i,j))});
+        var raw = s.slice(i, j);
+        if(dots > 1 || raw === '.') fail('E_NUM', null, i);
+        tokens.push({type:'num', value:parseFloat(raw), pos:i});
+        if(tokens.length > NUMERIC.MAX_TOKENS) fail('E_TOO_COMPLEX', null, i);
         i = j; continue;
       }
       if(/[a-zA-Z]/.test(c)){
         var k2 = i;
         while(k2 < n && /[a-zA-Z]/.test(s[k2])) k2++;
         var word = s.slice(i, k2);
-        if(word === 'pi'){ tokens.push({type:'num', value:Math.PI}); i = k2; continue; }
-        if(word === 'e'){ tokens.push({type:'num', value:Math.E}); i = k2; continue; }
-        if(FUNCS.indexOf(word) >= 0){ tokens.push({type:'func', value:word}); i = k2; continue; }
-        throw new Error('未知函数: ' + word);
+        if(word === 'pi'){ tokens.push({type:'num', value:Math.PI, pos:i}); i = k2; continue; }
+        if(word === 'e'){ tokens.push({type:'num', value:Math.E, pos:i}); i = k2; continue; }
+        if(FUNCS.indexOf(word) >= 0){ tokens.push({type:'func', value:word, pos:i}); i = k2; continue; }
+        fail('E_UNKNOWN_FUNC', '未知函数: ' + word, i);
       }
-      if(c === '(' || c === ')'){ tokens.push({type:'paren', value:c}); i++; continue; }
-      if(c === '+' || c === '-' || c === '*' || c === '/' || c === '^'){ tokens.push({type:'op', value:c}); i++; continue; }
-      if(c === '%' || c === '!'){ tokens.push({type:'post', value:c}); i++; continue; }
-      throw new Error('无法识别的字符: ' + c);
+      if(c === '(' || c === ')'){ tokens.push({type:'paren', value:c, pos:i}); i++; continue; }
+      if(c === '+' || c === '-' || c === '*' || c === '/' || c === '^'){ tokens.push({type:'op', value:c, pos:i}); i++; continue; }
+      if(c === '%' || c === '!'){ tokens.push({type:'post', value:c, pos:i}); i++; continue; }
+      fail('E_BAD_CHAR', '无法识别的字符: ' + c, i);
     }
+    if(tokens.length > NUMERIC.MAX_TOKENS) fail('E_TOO_COMPLEX', null, 0);
     return tokens;
   }
 
-  function Parser(tokens){ this.tokens = tokens; this.i = 0; this.termPct = null; this.lastTermPct = null; }
+  /* Parser 返回 {value, pct}：pct 仅用于「A ± B%」的上下文百分号语义，
+     不参与后续乘除或幂运算时会被自然清空。 */
+  function Parser(tokens, expr){ this.tokens = tokens; this.i = 0; this.expr = expr || ''; this.depth = 0; this.parenDepth = 0; }
+  Parser.prototype.enter = function(pos){ if(++this.depth > NUMERIC.MAX_DEPTH) fail('E_TOO_COMPLEX', null, pos); };
+  Parser.prototype.leave = function(){ this.depth--; };
   Parser.prototype.peek = function(){ return this.tokens[this.i]; };
   Parser.prototype.next = function(){ return this.tokens[this.i++]; };
   Parser.prototype.parse = function(){
-    var v = this.parseExpr();
-    if(this.i < this.tokens.length) throw new Error('表达式不完整');
-    return v;
+    var info = this.parseExpr();
+    if(this.i < this.tokens.length){
+      var t = this.peek();
+      if(t.type === 'paren' && t.value === ')') fail('E_EXTRA_PAREN', null, t.pos);
+      fail('E_SYNTAX', '多余的内容', t.pos);
+    }
+    return info.value;
   };
   Parser.prototype.parseExpr = function(){
-    var left = this.parseTerm();
-    while(this.peek() && this.peek().type === 'op' && (this.peek().value === '+' || this.peek().value === '-')){
-      var op = this.next().value;
-      var right = this.parseTerm();
-      var pct = this.lastTermPct;
-      if(pct){
-        /* 上下文百分号：A ± B%  →  A ± A×B%（与 CASIO / iOS 一致） */
-        if(op === '+') left = left + left * pct.raw / 100;
-        else left = left - left * pct.raw / 100;
-      } else {
-        left = (op === '+') ? (left + right) : (left - right);
+    var head = this.peek();
+    this.enter(head ? head.pos : this.expr.length);
+    try{
+      var leftInfo = this.parseTerm();
+      var left = leftInfo.value;
+      while(this.peek() && this.peek().type === 'op' && (this.peek().value === '+' || this.peek().value === '-')){
+        var t = this.next();
+        var op = t.value;
+        var rightInfo = this.parseTerm();
+        if(rightInfo.pct !== null){
+          /* 上下文百分号：A ± B% → A ± A×B%（与 CASIO / iOS 一致） */
+          var adj = mulChecked(left, rightInfo.pct / 100, t.pos);
+          left = (op === '+') ? addChecked(left, adj, t.pos) : addChecked(left, -adj, t.pos);
+        } else {
+          left = (op === '+') ? addChecked(left, rightInfo.value, t.pos) : addChecked(left, -rightInfo.value, t.pos);
+        }
       }
-    }
-    return left;
+      return {value:left, pct:null};
+    } finally { this.leave(); }
   };
   Parser.prototype.parseTerm = function(){
-    this.termPct = null;
-    var left = this.parseFactor();
-    var firstPct = this.termPct;
-    var multi = false;
-    while(this.peek()){
-      var t = this.peek();
-      var isMul = (t.type === 'op' && (t.value === '*' || t.value === '/'));
-      var isImplicit = (t.type === 'num' || t.type === 'func' || (t.type === 'paren' && t.value === '('));
-      if(!isMul && !isImplicit) break;
-      var right;
-      if(isMul){ this.next(); right = this.parseFactor(); left = (t.value === '*') ? (left * right) : (left / right); }
-      else { right = this.parseFactor(); left = left * right; }
-      multi = true;
-    }
-    /* 只有「单独的 数字%」才具备上下文百分号语义 */
-    this.lastTermPct = multi ? null : firstPct;
-    this.termPct = null;
-    return left;
-  };
-  Parser.prototype.parseFactor = function(){
-    var base = this.parseUnary();
-    if(this.peek() && this.peek().type === 'op' && this.peek().value === '^'){
-      this.next();
-      var savedPct = this.termPct;
-      var exp = this.parseFactor();
-      this.termPct = savedPct;
-      return Math.pow(base, exp);
-    }
-    return base;
+    var head = this.peek();
+    this.enter(head ? head.pos : this.expr.length);
+    try{
+      var info = this.parseUnary();
+      var left = info.value;
+      var firstPct = info.pct;
+      var multi = false;
+      while(this.peek()){
+        var t = this.peek();
+        var isMul = (t.type === 'op' && (t.value === '*' || t.value === '/'));
+        var isImplicit = (t.type === 'num' || t.type === 'func' || (t.type === 'paren' && t.value === '('));
+        if(!isMul && !isImplicit) break;
+        var rightInfo;
+        if(isMul){
+          this.next();
+          rightInfo = this.parseUnary();
+          left = (t.value === '*') ? mulChecked(left, rightInfo.value, t.pos) : divChecked(left, rightInfo.value, t.pos);
+        } else {
+          rightInfo = this.parseUnary();
+          left = mulChecked(left, rightInfo.value, t.pos);
+        }
+        multi = true;
+      }
+      /* 只有「单独的 数字%」才具备上下文百分号语义 */
+      return {value:left, pct:(multi ? null : firstPct)};
+    } finally { this.leave(); }
   };
   Parser.prototype.parseUnary = function(){
-    if(this.peek() && this.peek().type === 'op' && (this.peek().value === '-' || this.peek().value === '+')){
-      var op = this.next().value;
-      var v = this.parseUnary();
-      if(op === '-' && this.termPct) this.termPct.raw = -this.termPct.raw;
-      return (op === '-') ? -v : v;
-    }
-    return this.parsePostfix();
+    var head = this.peek();
+    this.enter(head ? head.pos : this.expr.length);
+    try{
+      var t = this.peek();
+      if(t && t.type === 'op' && (t.value === '-' || t.value === '+')){
+        this.next();
+        var sub = this.parseUnary();
+        if(t.value === '-'){
+          if(sub.pct !== null) sub.pct = -sub.pct;
+          return {value:-sub.value, pct:sub.pct};
+        }
+        return sub;
+      }
+      return this.parsePower();
+    } finally { this.leave(); }
+  };
+  Parser.prototype.parsePower = function(){
+    var head = this.peek();
+    this.enter(head ? head.pos : this.expr.length);
+    try{
+      var baseInfo = this.parsePostfix();
+      var t = this.peek();
+      if(t && t.type === 'op' && t.value === '^'){
+        this.next();
+        /* 右结合：指数本身允许一元负号，2^-3、2^3^2 均按数学约定 */
+        var expInfo = this.parseUnary();
+        var r = Math.pow(baseInfo.value, expInfo.value);
+        if(isNaN(r)) fail('E_DOMAIN', '幂运算结果无效', t.pos);
+        return {value:ensureFinite(r, t.pos), pct:null};
+      }
+      return baseInfo;
+    } finally { this.leave(); }
   };
   Parser.prototype.parsePostfix = function(){
     var tok = this.peek();
-    var v = this.parsePrimary();
+    var info = this.parsePrimary();
+    var v = info.value;
+    var pct = info.pct;
     var wasBareNum = (tok && tok.type === 'num');
     while(this.peek() && this.peek().type === 'post'){
-      var p = this.next().value;
-      if(p === '%'){
-        if(wasBareNum && this.termPct === null) this.termPct = {raw:v};
-        v = v / 100;
+      var p = this.next();
+      if(p.value === '%'){
+        if(wasBareNum && pct === null) pct = v;
+        v = divChecked(v, 100, p.pos);
+      } else {
+        v = factorial(v, p.pos);
+        pct = null;
       }
-      else if(p === '!') v = factorial(v);
       wasBareNum = false;
     }
-    return v;
+    return {value:v, pct:pct};
   };
   Parser.prototype.parsePrimary = function(){
     var tok = this.peek();
-    if(!tok) throw new Error('表达式不完整');
-    if(tok.type === 'num'){ this.next(); return tok.value; }
+    if(!tok) fail('E_SYNTAX', '表达式不完整', this.expr.length);
+    if(tok.type === 'num'){ this.next(); return {value:tok.value, pct:null}; }
     if(tok.type === 'paren' && tok.value === '('){
       this.next();
-      var v = this.parseExpr();
-      var close = this.next();
-      if(!close || close.type !== 'paren' || close.value !== ')') throw new Error('缺少右括号');
-      return v;
+      this.parenDepth++;
+      try{
+        var info = this.parseExpr();
+        var close = this.peek();
+        if(!close || close.type !== 'paren' || close.value !== ')') fail('E_MISSING_PAREN', null, tok.pos);
+        this.next();
+        return {value:info.value, pct:null};
+      } finally { this.parenDepth--; }
+    }
+    if(tok.type === 'paren' && tok.value === ')'){
+      fail(this.parenDepth > 0 ? 'E_EMPTY_PAREN' : 'E_EXTRA_PAREN', null, tok.pos);
     }
     if(tok.type === 'func'){
       this.next();
-      var open = this.next();
-      if(!open || open.type !== 'paren' || open.value !== '(') throw new Error(tok.value + ' 后需要括号');
-      var arg = this.parseExpr();
-      var c2 = this.next();
-      if(!c2 || c2.type !== 'paren' || c2.value !== ')') throw new Error('缺少右括号');
-      return applyFunc(tok.value, arg);
+      var open = this.peek();
+      if(!open || open.type !== 'paren' || open.value !== '(') fail('E_SYNTAX', tok.value + ' 后需要括号', tok.pos);
+      this.next();
+      this.parenDepth++;
+      try{
+        var argInfo = this.parseExpr();
+        var c2 = this.peek();
+        if(!c2 || c2.type !== 'paren' || c2.value !== ')') fail('E_MISSING_PAREN', null, open.pos);
+        this.next();
+        return {value:applyFunc(tok.value, argInfo.value, c2.pos), pct:null};
+      } finally { this.parenDepth--; }
     }
-    throw new Error('意外的符号');
+    if(tok.type === 'op') fail('E_SYNTAX', '运算符后缺少数字或表达式', tok.pos);
+    fail('E_SYNTAX', '意外的符号', tok.pos);
   };
 
-  function factorial(n){
-    if(n < 0 || !isFinite(n) || Math.floor(n) !== n) throw new Error('阶乘需要非负整数');
-    if(n > 170) throw new Error('数值过大');
+  function factorial(n, pos){
+    var r0 = Math.round(n);
+    if(!isFinite(n) || Math.abs(n - r0) > NUMERIC.TOL || r0 < 0) fail('E_FACTORIAL', null, pos);
+    if(r0 > NUMERIC.MAX_FACTORIAL) fail('E_TOO_LARGE', null, pos);
     var r = 1;
-    for(var i = 2; i <= n; i++) r *= i;
+    for(var i = 2; i <= r0; i++) r = mulChecked(r, i, pos);
     return r;
   }
 
-  function applyFunc(name, x){
-    var r = (state.deg && (name === 'sin' || name === 'cos' || name === 'tan')) ? (x * Math.PI / 180) : x;
+  function applyFunc(name, x, pos){
+    if(!isFinite(x)) fail('E_OVERFLOW', null, pos);
+    var r;
     switch(name){
-      case 'sin': return Math.sin(r);
-      case 'cos': return Math.cos(r);
-      case 'tan': return Math.tan(r);
-      case 'asin': { var a = Math.asin(x); return state.deg ? a * 180 / Math.PI : a; }
-      case 'acos': { var a = Math.acos(x); return state.deg ? a * 180 / Math.PI : a; }
-      case 'atan': { var a = Math.atan(x); return state.deg ? a * 180 / Math.PI : a; }
-      case 'sinh': return Math.sinh(x);
-      case 'cosh': return Math.cosh(x);
-      case 'tanh': return Math.tanh(x);
-      case 'sqrt': return Math.sqrt(x);
-      case 'cbrt': return Math.cbrt(x);
-      case 'abs': return Math.abs(x);
-      case 'exp': return Math.exp(x);
-      case 'log': return Math.log10(x);
-      case 'ln': return Math.log(x);
-      case 'floor': return Math.floor(x);
-      case 'ceil': return Math.ceil(x);
-      case 'round': return Math.round(x);
-      default: throw new Error('未知函数');
+      case 'sin': r = Math.sin(state.deg ? x * Math.PI / 180 : x); break;
+      case 'cos': r = Math.cos(state.deg ? x * Math.PI / 180 : x); break;
+      case 'tan': {
+        var ang = state.deg ? x * Math.PI / 180 : x;
+        var k = (ang - Math.PI / 2) / Math.PI;
+        if(Math.abs(k - Math.round(k)) < 1e-12) fail('E_UNDEFINED', null, pos);
+        r = Math.tan(ang);
+        break;
+      }
+      case 'asin': {
+        if(x < -1 - NUMERIC.TOL || x > 1 + NUMERIC.TOL) fail('E_DOMAIN', '反三角函数参数须在 -1 到 1 之间', pos);
+        r = Math.asin(Math.max(-1, Math.min(1, x)));
+        if(state.deg) r = r * 180 / Math.PI;
+        break;
+      }
+      case 'acos': {
+        if(x < -1 - NUMERIC.TOL || x > 1 + NUMERIC.TOL) fail('E_DOMAIN', '反三角函数参数须在 -1 到 1 之间', pos);
+        r = Math.acos(Math.max(-1, Math.min(1, x)));
+        if(state.deg) r = r * 180 / Math.PI;
+        break;
+      }
+      case 'atan': r = Math.atan(x); if(state.deg) r = r * 180 / Math.PI; break;
+      case 'sinh': r = Math.sinh(x); if(!isFinite(r)) fail('E_TOO_LARGE', null, pos); break;
+      case 'cosh': r = Math.cosh(x); if(!isFinite(r)) fail('E_TOO_LARGE', null, pos); break;
+      case 'tanh': r = Math.tanh(x); break;
+      case 'sqrt':
+        if(x < -NUMERIC.TOL) fail('E_DOMAIN', '负数不能开方', pos);
+        r = Math.sqrt(Math.max(0, x));
+        break;
+      case 'cbrt': r = Math.cbrt(x); break;
+      case 'abs': r = Math.abs(x); break;
+      case 'exp': r = Math.exp(x); if(!isFinite(r)) fail('E_TOO_LARGE', null, pos); break;
+      case 'log':
+        if(x <= 0) fail('E_DOMAIN', '对数参数必须大于 0', pos);
+        r = Math.log10(x);
+        break;
+      case 'ln':
+        if(x <= 0) fail('E_DOMAIN', '对数参数必须大于 0', pos);
+        r = Math.log(x);
+        break;
+      case 'floor': r = Math.floor(x); break;
+      case 'ceil': r = Math.ceil(x); break;
+      case 'round': r = Math.round(x); break;
+      default: fail('E_UNKNOWN_FUNC', null, pos);
+    }
+    return ensureFinite(r, pos);
+  }
+
+  /* 计算核心唯一入口：永远返回 Result，不向 UI 抛异常 */
+  function calculate(expr){
+    try{
+      var tokens = tokenize(expr);
+      if(tokens.length === 0) return calcErr('E_EMPTY');
+      var p = new Parser(tokens, String(expr == null ? '' : expr));
+      var v = p.parse();
+      if(typeof v !== 'number' || !isFinite(v)) return calcErr('E_OVERFLOW');
+      return {ok:true, value:(v === 0 ? 0 : v)};
+    }catch(e){
+      var msg = (e.pos != null ? ('第 ' + (e.pos + 1) + ' 位：') : '') + (e.message || ERR_MSG[e.code] || '计算错误');
+      return {ok:false, code:e.code || 'E_SYNTAX', message:msg, pos:(e.pos == null ? null : e.pos)};
     }
   }
-
+  /* 兼容旧调用：内部仍不执行用户字符串，只是把 Result 转成异常 */
   function evaluate(expr){
-    var tokens = tokenize(expr);
-    if(tokens.length === 0) throw new Error('空表达式');
-    var p = new Parser(tokens);
-    return p.parse();
+    var r = calculate(expr);
+    if(!r.ok) fail(r.code, r.message.replace(/^第 \d+ 位：/, ''), r.pos);
+    return r.value;
   }
 
+  function normalizePlain(s){
+    if(s.indexOf('e') >= 0 || s.indexOf('E') >= 0) return s;
+    var parts = s.split('.');
+    if(parts[1]) parts[1] = parts[1].replace(/0+$/, '');
+    return parts[1] ? parts.join('.') : parts[0];
+  }
   function formatResult(v){
-    if(typeof v !== 'number' || isNaN(v)) return '无效';
-    if(!isFinite(v)) return v > 0 ? '∞' : '-∞';
+    /* 非有限值统一为「无效」，绝不把 NaN / Infinity 当正常结果展示 */
+    if(typeof v !== 'number' || !isFinite(v)) return '无效';
     if(v === 0) return '0';
     var a = Math.abs(v);
-    if(a >= 1e15 || a < 1e-9){
-      return v.toExponential(8).replace(/\.?0+e/,'e').replace('e+','e');
-    }
-    return parseFloat(v.toPrecision(12)).toString();
+    if(a >= NUMERIC.SCI_HIGH || a < NUMERIC.SCI_LOW) return toSci(v, NUMERIC.DISPLAY_SIG);
+    return normalizePlain(parseFloat(v.toPrecision(NUMERIC.DISPLAY_SIG)).toString());
   }
 
   /* 千分位显示（仅用于结果/历史展示，不影响表达式内部计算） */
   function formatDisplay(v){
     var s = formatResult(v);
-    if(s === '无效' || s === '∞' || s === '-∞') return s;
+    if(s === '无效') return s;
     if(s.indexOf('e') >= 0 || s.indexOf('E') >= 0) return s;
     var neg = s[0] === '-';
     if(neg) s = s.slice(1);
@@ -836,6 +1021,9 @@
       if(a >= 1e15) return toSci(scaled, 4);
       return scaled.toFixed(2).replace(/\.?0+$/,'');
     }
+    /* 常规小数统一保留 2 位（如 0.01235亿 → 0.01亿）；
+       极小值再动态扩位，避免直接变成 0.00 丢失信息 */
+    if(a >= 0.005) return scaled.toFixed(2).replace(/\.?0+$/,'');
     /* 保留 4 位有效数字所需的十进制位数 */
     var p = Math.ceil(-Math.log(a) / Math.LN10) + 3;
     if(p < 4) p = 4;
@@ -862,8 +1050,7 @@
   function formatWithUnit(v){
     var u = UNITS[state.unit] || UNITS[0];
     if(u.scale === 1) return formatDisplay(v);
-    if(typeof v !== 'number' || isNaN(v)) return '无效';
-    if(!isFinite(v)) return v > 0 ? '∞' : '-∞';
+    if(typeof v !== 'number' || !isFinite(v)) return '无效';
     if(v === 0) return '0';
     var scaled = v / u.scale;
     /* 换算结果小数点后前 4 位全是 0（如 0.00001亿）→ 不显示换算结果，回退原值 */
@@ -874,6 +1061,7 @@
     parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,',');
     return (neg?'-':'') + parts.join('.') + u.label;
   }
+  /* ==== CALC CORE END ==== */
 
   /* ---------- input editing ---------- */
   function currentExpr(){ return exprStr; }
@@ -987,7 +1175,9 @@
   }
 
   function insertText(text){
+    if(String(text).length + exprStr.length > NUMERIC.MAX_EXPR_LEN){ showToast('表达式过长'); return; }
     justEvaluated = false; resultRaw = null;
+    resultEl.classList.remove('error');
     /* 括号内运算已完成时输入运算符 → 光标跳出右括号，符合直觉
        例：() 填 1+2 后按 × 应得到 (1+2)× 而非 (1+2×) */
     var isOp = /^[+\-×÷^%]+$/.test(text);
@@ -1001,6 +1191,7 @@
   function backspace(){
     if(caretPos <= 0) return;
     justEvaluated = false; resultRaw = null;
+    resultEl.classList.remove('error');
     exprStr = exprStr.slice(0, caretPos - 1) + exprStr.slice(caretPos);
     caretPos -= 1;
     render();
@@ -1009,44 +1200,44 @@
 
   function setExpr(text){
     justEvaluated = false; resultRaw = null;
-    exprStr = text;
+    var s = String(text == null ? '' : text);
+    if(s.length > NUMERIC.MAX_EXPR_LEN) s = s.slice(0, NUMERIC.MAX_EXPR_LEN);
+    exprStr = s;
     caretPos = exprStr.length;
+    resultEl.classList.remove('error');
     render();
+    onUserInput();
   }
 
   function clearAll(){
     setExpr('');
     resultEl.textContent = '';
     autoSize();
-    onUserInput();
   }
 
   function negate(){
     var expr = currentExpr().trim();
     if(!expr) return;
-    try{
-      var v = evaluate(expr);
-      setExpr(formatResult(-v));
-      onUserInput();
-    }catch(e){}
+    var r = calculate(expr);
+    if(!r.ok){ showCalcError(r); return; }
+    setExpr(formatResult(-r.value));
+    onUserInput();
   }
 
   /* ---------- preview & timer ---------- */
   function updatePreview(){
     var expr = currentExpr().trim();
     if(!expr){ resultEl.textContent = ''; return; }
-    try{
-      var v = evaluate(expr);
-      /* 结果态：主显示区显示换算值，小字行给出原值对照 */
-      if(justEvaluated){
-        resultEl.textContent = (state.unit !== 0) ? ('= ' + formatDisplay(v)) : '';
-      } else {
-        resultEl.textContent = '= ' + formatWithUnit(v);
-      }
-      resultEl.classList.remove('error');
-    }catch(e){
-      resultEl.textContent = '';
+    var r = calculate(expr);
+    if(!r.ok){ resultEl.textContent = ''; return; }
+    var v = r.value;
+    /* 结果态：主显示区显示换算值，小字行给出原值对照 */
+    if(justEvaluated){
+      resultEl.textContent = (state.unit !== 0) ? ('= ' + formatDisplay(v)) : '';
+    } else {
+      resultEl.textContent = '= ' + formatWithUnit(v);
     }
+    resultEl.classList.remove('error');
   }
 
   function autoSize(){
@@ -1059,6 +1250,8 @@
     else if(len <= 36) fs = 24;
     else fs = 20;
     if(window.innerWidth <= 480 && fs > 38) fs = 38;
+    /* 横屏矮屏限制字号，避免撑破显示区 */
+    if(window.innerHeight <= 600 && fs > 30) fs = 30;
     exprBox.style.fontSize = fs + 'px';
     /* 超长时按真实渲染宽度等比缩小，保证完整显示 */
     var cs = getComputedStyle(exprBox);
@@ -1089,33 +1282,37 @@
       aggTimer = null;
       var expr = currentExpr().trim();
       if(!expr) return;
-      var v;
-      try{ v = evaluate(expr); }
-      catch(e){ return; }
-      if(typeof v !== 'number' || isNaN(v)) return;
-      addHistory(expr, v);
+      var r = calculate(expr);
+      if(!r.ok) return;
+      addHistory(expr, r.value);
       /* 已记录的表达式不再重复计时，直到用户再次输入 */
     }, state.aggDelay || 10000);
   }
 
   function currentResultOrZero(){
     var expr = currentExpr().trim();
-    if(expr){ try{ return evaluate(expr); }catch(e){} }
+    if(expr){ var r = calculate(expr); if(r.ok) return r.value; }
     return state.ans;
   }
 
   /* ---------- actions ---------- */
+  function showCalcError(r){
+    resultEl.textContent = (r && r.message) ? r.message : '计算错误';
+    resultEl.classList.add('error');
+    resultEl.classList.remove('pulse');
+    void resultEl.offsetWidth;
+    resultEl.classList.add('pulse');
+    setTimeout(function(){ resultEl.classList.remove('pulse'); }, 360);
+  }
+
+  /* 连续按 = 的语义：对当前显示结果重新求值，不重复上一轮运算；
+     历史去重避免同一结果被反复写入。 */
   function pressEquals(){
     var expr = currentExpr().trim();
     if(!expr) return;
-    var v;
-    try{ v = evaluate(expr); }
-    catch(e){
-      resultEl.textContent = '错误';
-      resultEl.classList.add('pulse');
-      setTimeout(function(){ resultEl.classList.remove('pulse'); }, 360);
-      return;
-    }
+    var r = calculate(expr);
+    if(!r.ok){ showCalcError(r); return; }
+    var v = r.value;
     var resStr = formatResult(v);
     addHistory(expr, v);
     state.ans = v;
@@ -1127,6 +1324,7 @@
     render();
     updatePreview();
     autoSize();
+    resultEl.classList.remove('error');
     resultEl.classList.add('pulse');
     setTimeout(function(){ resultEl.classList.remove('pulse'); }, 360);
     /* 按 = 时该次计算已记入历史，清掉待触发的激进计时，避免重复记录 */
@@ -1137,7 +1335,7 @@
   function handleAction(act){
     switch(act){
       case 'clear': clearAll(); break;
-      case 'clearEntry': setExpr(''); resultEl.textContent=''; autoSize(); onUserInput(); break;
+      case 'clearEntry': setExpr(''); resultEl.textContent=''; autoSize(); break;
       case 'backspace': backspace(); break;
       case 'paren':
         insertText(decideParen());
@@ -1409,10 +1607,11 @@
   document.addEventListener('copy', function(e){
     if(!exprStr) return;
     var sel = (window.getSelection && window.getSelection().toString()) || '';
-    if(!sel) return;
+    if(!sel || sel.length > NUMERIC.MAX_EXPR_LEN) return;
+    var anchor = window.getSelection().anchorNode;
+    if(!exprBox.contains(anchor)) return;   /* 只劫持表达式区，历史/设置区复制保持原样 */
     var disp = formatExprDisplay(exprStr);
-    /* 选区是显示串的一部分（千分位显示），或光标在表达式内 → 视为复制公式 */
-    if(disp.indexOf(sel) >= 0 || sel.indexOf(sel) >= 0){
+    if(disp.indexOf(sel) >= 0 || sel === disp){
       if(e.clipboardData){
         try{ e.clipboardData.setData('text/plain', exprStr); e.preventDefault(); }catch(err){}
       }
@@ -1515,6 +1714,30 @@
     else if(k === 'e' && !e.ctrlKey && !e.metaKey){ e.preventDefault(); insertText('e'); }
   });
 
+  /* 粘贴清洗：仅允许计算器字符，超长截断，非法内容直接拒绝 */
+  document.addEventListener('paste', function(e){
+    var cd = e.clipboardData || window.clipboardData;
+    if(!cd) return;
+    var t = cd.getData('text');
+    if(!t) return;
+    e.preventDefault();
+    var clean = String(t).replace(/[\r\n\t ]/g, '');
+    if(clean.length > NUMERIC.MAX_EXPR_LEN) clean = clean.slice(0, NUMERIC.MAX_EXPR_LEN);
+    if(!/^[0-9+\-*/×÷−^().%!a-zA-Zπ]*$/.test(clean)){ showToast('粘贴内容含非法字符，已拒绝'); return; }
+    if(!clean){ showToast('没有可粘贴的内容'); return; }
+    setExpr(clean);
+  });
+
+  document.addEventListener('keydown', function(e){
+    if((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')){
+      var el = document.activeElement;
+      if(exprStr && !(el && /^(INPUT|TEXTAREA)$/.test(el.tagName))){
+        e.preventDefault();
+        copyText(exprStr);
+      }
+    }
+  });
+
   document.getElementById('themeBtn').addEventListener('click', function(){
     setTheme(state.theme === 'eink' ? 'dark' : 'eink');
   });
@@ -1563,7 +1786,16 @@
     if(confirmCb){ var cb = confirmCb; confirmCb = null; cb(); }
   });
 
+  /* 旋转 / 分屏后重新按实际视口排版 */
+  window.addEventListener('resize', function(){
+    autoSize();
+    render();
+  });
+
   /* ---------- init ---------- */
+  Array.prototype.forEach.call(document.querySelectorAll('#keypad button'), function(b){
+    if(!b.getAttribute('aria-label') && b.textContent.trim()) b.setAttribute('aria-label', b.textContent.trim());
+  });
   setTheme(state.theme);
   setMode(state.mode);
   setCalcMode(state.calcMode);
