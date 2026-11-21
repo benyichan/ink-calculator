@@ -63,6 +63,7 @@
   }
 
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  button{touch-action:manipulation;}
   html,body{height:100%;}
   body{
     font-family:var(--font-sans);
@@ -98,7 +99,7 @@
     display:flex;align-items:center;justify-content:center;cursor:pointer;
     transition:transform .12s ease,background .15s ease;
   }
-  .icon-btn:active{transform:translateY(1px);}
+  .icon-btn:active{filter:brightness(.94);}
   .icon-btn svg{width:17px;height:17px;}
   .hidden{display:none !important;}
 
@@ -194,7 +195,7 @@
     display:flex;align-items:center;justify-content:center;
     -webkit-tap-highlight-color:transparent;
   }
-  .backspace-btn:active{transform:translateY(1px);filter:brightness(.94);}
+  .backspace-btn:active{filter:brightness(.9);}
   #toast{
     position:fixed;left:50%;top:76px;transform:translateX(-50%) translateY(-8px);
     background:var(--accent);color:var(--eq-ink);font-family:var(--font-sans);
@@ -221,7 +222,7 @@
     box-shadow:0 1px 2px rgba(40,40,36,.08);
     display:flex;align-items:center;justify-content:center;
   }
-  button.btn:active{transform:translateY(1px);box-shadow:none;filter:brightness(.97);}
+  button.btn:active{box-shadow:none;filter:brightness(.94);}
   button.btn.num{background:var(--num-bg);color:var(--num-ink);font-size:26px;font-weight:700;}
   button.btn.fn{background:var(--fn-bg);color:var(--fn-ink);font-size:15px;font-weight:500;}
   button.btn.op{background:var(--op-bg);color:var(--op-ink);font-size:26px;font-weight:500;border-color:transparent;}
@@ -251,7 +252,7 @@
     background:var(--chip-bg);color:var(--chip-ink);font-size:13px;font-weight:600;cursor:pointer;
     transition:transform .12s ease;
   }
-  .chip-btn:active{transform:translateY(1px);}
+  .chip-btn:active{filter:brightness(.94);}
   .chip-btn.danger{color:var(--danger);}
   .chip-btn.on{background:var(--eq-bg);color:var(--eq-ink);border-color:transparent;}
   .history-list{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;}
@@ -339,6 +340,11 @@
   }
   .help-modal .modal-actions{padding:12px 20px 18px;}
 
+  /* 电子墨水屏/降动效环境：停掉连闪光标与全局过渡，避免持续刷新拖慢整机 */
+  @media (prefers-reduced-motion: reduce){
+    #expr .caret{animation:none;}
+    body{transition:none;}
+  }
   @media (max-width:480px){
     #expr{font-size:38px;}
   }
@@ -421,7 +427,7 @@
       <button class="btn fn" data-ins="cos(">cos</button>
       <button class="btn fn" data-ins="tan(">tan</button>
       <button class="btn fn" data-ins="π">π</button>
-      <button class="btn fn danger" data-act="backspace">⌫</button>
+      <button class="btn num danger" data-act="clear">C</button>
       <button class="btn fn" data-ins="ln(">ln</button>
       <button class="btn fn" data-ins="log(">log</button>
       <button class="btn fn" data-ins="e">e</button>
@@ -1174,38 +1180,58 @@
     return formatExprDisplay(exprStr);
   }
 
+  /* 常驻 span：按键高频路径只改 textContent，不做节点重建（响应性关键路径） */
+  var phSpan = document.createElement('span'); phSpan.className = 'expr-placeholder'; phSpan.textContent = '0';
+  var wholeSpan = document.createElement('span');
+  var bSpan = document.createElement('span');
+  var caretSpan = document.createElement('span'); caretSpan.className = 'caret';
+  var aSpan = document.createElement('span');
   function render(){
-    exprBox.innerHTML = '';
     if(exprStr === ''){
-      var ph = document.createElement('span');
-      ph.className = 'expr-placeholder';
-      ph.textContent = '0';
-      exprBox.appendChild(ph);
+      if(exprBox.firstChild !== phSpan){
+        exprBox.innerHTML = '';
+        exprBox.appendChild(phSpan);
+      }
+      return;
     }
     var disp = displayText();
     if(justEvaluated && state.unit !== 0 && resultRaw !== null){
       /* 单位换算态：整段只读展示，不参与光标定位 */
-      var whole = document.createElement('span');
-      whole.textContent = disp;
-      exprBox.appendChild(whole);
+      if(exprBox.firstChild !== wholeSpan){
+        exprBox.innerHTML = '';
+        exprBox.appendChild(wholeSpan);
+      }
+      wholeSpan.textContent = disp;
       return;
     }
+    if(exprBox.firstChild !== bSpan){
+      exprBox.innerHTML = '';
+      exprBox.appendChild(bSpan);
+      exprBox.appendChild(caretSpan);
+      exprBox.appendChild(aSpan);
+    }
     var dCaret = toDispPos(caretPos);
-    var before = disp.slice(0, dCaret);
-    var after = disp.slice(dCaret);
-    if(before){
-      var b = document.createElement('span');
-      b.textContent = before;
-      exprBox.appendChild(b);
-    }
-    var c = document.createElement('span');
-    c.className = 'caret';
-    exprBox.appendChild(c);
-    if(after){
-      var a = document.createElement('span');
-      a.textContent = after;
-      exprBox.appendChild(a);
-    }
+    bSpan.textContent = disp.slice(0, dCaret);
+    aSpan.textContent = disp.slice(dCaret);
+  }
+
+  /* 复用同一 canvas 做文字测量，避免每次按键/点击新建 2D 上下文 */
+  var measureCanvas = null;
+  function measureCtx(fontCss){
+    if(!measureCanvas) measureCanvas = document.createElement('canvas');
+    var ctx = measureCanvas.getContext('2d');
+    ctx.font = fontCss;
+    return ctx;
+  }
+  /* 表达式区度量值只在初始化/resize 时读取一次，按键路径不再触发强制布局 */
+  var exprPadL = 0, exprPadR = 0, exprClientW = 0, exprFontWeight = '600', exprFontFamily = '';
+  function cacheExprMetrics(){
+    var cs = getComputedStyle(exprBox);
+    exprPadL = parseFloat(cs.paddingLeft) || 0;
+    exprPadR = parseFloat(cs.paddingRight) || 0;
+    exprClientW = exprBox.clientWidth;
+    exprFontWeight = cs.fontWeight;
+    exprFontFamily = cs.fontFamily;
   }
 
   /* 比例字体下按真实渲染宽度定位光标：
@@ -1213,17 +1239,12 @@
   function posFromX(x){
     var disp = displayText();
     var rect = exprBox.getBoundingClientRect();
-    var cs = getComputedStyle(exprBox);
-    var padL = parseFloat(cs.paddingLeft) || 0;
-    var padR = parseFloat(cs.paddingRight) || 0;
-    var contentW = rect.width - padL - padR;
-    var canvas = document.createElement('canvas');
-    var ctx = canvas.getContext('2d');
-    ctx.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+    var fontSize = exprBox.style.fontSize || '44px';
+    var ctx = measureCtx(exprFontWeight + ' ' + fontSize + ' ' + exprFontFamily);
     var totalW = ctx.measureText(disp).width;
     if(totalW <= 0) return 0;
     /* 显示文本右对齐，起点 = 内容区右端 - 文本总宽 */
-    var startX = rect.width - padR - totalW;
+    var startX = rect.width - exprPadR - totalW;
     var rel = x - startX;
     if(rel <= 0) return 0;
     var acc = 0;
@@ -1353,14 +1374,11 @@
     /* 横屏矮屏限制字号，避免撑破显示区 */
     if(window.innerHeight <= 600 && fs > 30) fs = 30;
     exprBox.style.fontSize = fs + 'px';
-    /* 超长时按真实渲染宽度等比缩小，保证完整显示 */
-    var cs = getComputedStyle(exprBox);
-    var avail = exprBox.clientWidth - parseFloat(cs.paddingLeft || 0) - parseFloat(cs.paddingRight || 0);
+    /* 超长时按真实渲染宽度等比缩小（测量走复用 canvas，度量走缓存，按键路径零强制布局） */
     if(len > 0){
-      var canvas = document.createElement('canvas');
-      var ctx = canvas.getContext('2d');
-      ctx.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+      var ctx = measureCtx(exprFontWeight + ' ' + fs + 'px ' + exprFontFamily);
       var w = ctx.measureText(disp).width;
+      var avail = exprClientW - exprPadL - exprPadR;
       if(w > avail && w > 0){
         fs = Math.floor(fs * avail / w);
         if(fs < 13) fs = 13;
@@ -1892,6 +1910,7 @@
 
   /* 旋转 / 分屏后重新按实际视口排版 */
   window.addEventListener('resize', function(){
+    cacheExprMetrics();
     autoSize();
     render();
   });
@@ -1905,6 +1924,7 @@
   setCalcMode(state.calcMode);
   updateIndicators();
   renderHistory();
+  cacheExprMetrics();
   autoSize();
   render();
 })();
