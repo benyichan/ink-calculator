@@ -207,6 +207,7 @@
   #result.error{color:var(--accent);font-weight:600;}
   #result.pulse{animation:pulse .35s ease;}
   @keyframes pulse{45%{color:var(--accent);}}
+  @keyframes guidePop{from{transform:translateY(6px) scale(.97);opacity:0;}to{transform:none;opacity:1;}}
 
   /* ---------- keypad（撑满剩余空间） ---------- */
   .keypad{flex:1;min-height:0;display:flex;flex-direction:column;}
@@ -340,6 +341,44 @@
   }
   .help-modal .modal-actions{padding:12px 20px 18px;}
 
+  /* ---------- 使用引导（Tour / Spotlight，样式对齐利润测算工具） ---------- */
+  .guide-root{position:fixed;inset:0;z-index:500;display:none;}
+  .guide-root.open{display:block;}
+  .guide-spot{
+    position:absolute;border-radius:12px;pointer-events:none;
+    box-shadow:0 0 0 9999px rgba(32,32,30,.46),0 0 0 2px var(--accent);
+    transition:all .24s cubic-bezier(.2,.8,.3,1.0);
+  }
+  .guide-card{
+    position:absolute;width:340px;max-width:calc(100vw - 32px);
+    background:var(--card);border:1px solid var(--line);
+    border-radius:14px;box-shadow:var(--shadow);
+    overflow:hidden;animation:guidePop .2s cubic-bezier(.2,.9,.3,1.15);
+  }
+  .guide-card::before{
+    content:"";position:absolute;inset:0 0 auto 0;height:2.5px;
+    background:linear-gradient(90deg,var(--danger),var(--accent));
+  }
+  .guide-head{display:flex;align-items:center;gap:10px;padding:14px 16px 0;}
+  .guide-step{font-family:var(--font-mono);font-size:11px;color:var(--danger);font-weight:700;letter-spacing:.5px;}
+  .guide-title{font-size:14px;font-weight:700;flex:1;color:var(--ink);}
+  .guide-close{width:26px;height:26px;border-radius:7px;border:none;background:transparent;color:var(--ink-soft);cursor:pointer;display:grid;place-items:center;transition:all .13s;font-size:15px;line-height:1;}
+  .guide-close:hover{background:var(--fn-bg);color:var(--ink);}
+  .guide-body{padding:9px 16px 8px;font-size:12.5px;color:var(--ink-soft);line-height:1.65;}
+  .guide-body b{color:var(--ink);font-weight:700;}
+  .guide-body ul{padding-left:18px;margin:4px 0;}
+  .guide-foot{display:flex;align-items:center;gap:8px;padding:10px 16px 14px;}
+  .guide-dots{display:flex;gap:5px;flex:1;}
+  .guide-dots i{width:6px;height:6px;border-radius:50%;background:var(--line);transition:all .16s;}
+  .guide-dots i.on{width:16px;border-radius:4px;background:var(--danger);}
+  .guide-foot button{
+    height:32px;padding:0 14px;border-radius:8px;border:1px solid var(--line);
+    background:var(--chip-bg);color:var(--chip-ink);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font-sans);
+  }
+  .guide-foot button.primary{background:var(--eq-bg);color:var(--eq-ink);border-color:transparent;}
+  .guide-foot button:disabled{opacity:.45;cursor:default;}
+  .guide-arrow{position:absolute;width:12px;height:12px;background:var(--card);border:1px solid var(--line);transform:rotate(45deg);z-index:1;}
+
   /* 电子墨水屏/降动效环境：停掉连闪光标与全局过渡，避免持续刷新拖慢整机 */
   @media (prefers-reduced-motion: reduce){
     #expr .caret{animation:none;}
@@ -389,6 +428,9 @@
       <button class="icon-btn" id="settingsBtn" title="设置" aria-label="设置">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="7" cy="18" r="2" fill="currentColor" stroke="none"/></svg>
       </button>
+      <button class="icon-btn" id="tourBtn" title="使用引导" aria-label="使用引导">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.4 10.9c.7.5 1.1 1.2 1.3 2.1h4.2c.2-.9.6-1.6 1.3-2.1A6 6 0 0 0 12 3z"/></svg>
+      </button>
     </div>
   </div>
 
@@ -398,8 +440,8 @@
       <button data-cm="sci">科学</button>
     </div>
     <div class="seg" id="histSeg">
-      <button data-mode="aggressive">激进</button>
-      <button class="on" data-mode="normal">平常</button>
+      <button data-mode="aggressive">自动</button>
+      <button class="on" data-mode="normal">手动</button>
     </div>
   </div>
 
@@ -481,6 +523,24 @@
 <div id="toast"></div>
 <div class="backdrop" id="backdrop"></div>
 
+<div class="guide-root" id="guideRoot">
+  <div class="guide-spot" id="guideSpot"></div>
+  <div class="guide-card" id="guideCard">
+    <div class="guide-arrow" id="guideArrow"></div>
+    <div class="guide-head">
+      <span class="guide-step" id="guideStep">1 / 7</span>
+      <span class="guide-title" id="guideTitle"></span>
+      <button class="guide-close" id="guideClose" title="退出引导" aria-label="退出引导">✕</button>
+    </div>
+    <div class="guide-body" id="guideBody"></div>
+    <div class="guide-foot">
+      <div class="guide-dots" id="guideDots"></div>
+      <button id="guidePrev">上一步</button>
+      <button class="primary" id="guideNext">下一步</button>
+    </div>
+  </div>
+</div>
+
 <div class="drawer" id="drawer">
   <div class="drawer-head">
     <div class="row1">
@@ -508,10 +568,10 @@
       <input id="maxHistInput" type="number" min="1" max="1000" value="30">
     </div>
     <div class="field">
-      <label for="aggDelayInput">激进模式停顿（秒）</label>
+      <label for="aggDelayInput">自动模式停顿（秒）</label>
       <input id="aggDelayInput" type="number" min="1" max="120" step="1" value="10">
     </div>
-    <div class="modal-body">历史记录仅保存在本机浏览器（localStorage），不会上传。切换到「激进」模式后，输入停止超过设定时长即自动记入历史（无需按 = 号）。</div>
+    <div class="modal-body">历史记录仅保存在本机浏览器（localStorage），不会上传。「自动」模式：输入停止超过设定时长即自动记入历史（无需按 = 号）；「手动」模式：按 = 号才记录。</div>
     <div class="modal-actions">
       <button id="settingsClose">取消</button>
       <button class="primary" id="settingsSave">保存</button>
@@ -600,7 +660,8 @@
     unit: 0,
     unitV: 1,
     aggDelay: 10000,
-    aggV: 3
+    aggV: 3,
+    tourDone: false
   };
 
   function load(){
@@ -1913,6 +1974,126 @@
     cacheExprMetrics();
     autoSize();
     render();
+    if(tour.open) tourPlace();
+  });
+
+  /* ---------- 使用引导（Tour） ---------- */
+  var tourSteps = [
+    { selector: null, title: '欢迎使用 Ink Calculator',
+      body: '<p>这是为认真算数的人设计的<b>墨水屏计算器</b>——无广告、纯本地、完全离线。</p><p>用 30 秒认识几个最顺手的功能，随时可跳过。</p>' },
+    { selector: '#unitPicker', title: '显示单位随手切',
+      body: '<p>左上角这里切换结果单位：<b>原值 / 千 / 万 / 十万 / 百万 / 千万 / 亿 / 十亿</b>。</p><ul><li>算完的数立刻按你的单位读。</li><li>历史记录会跟着一起实时换算。</li></ul>' },
+    { selector: '#historyBtn', title: '算过的，都留着',
+      body: '<p>右上角时钟打开<b>计算历史</b>。</p><ul><li>记录全在本机，不上传。</li><li>点任意条目<b>回填公式</b>，结果按当前单位显示。</li><li>支持多选删除与一键清空。</li></ul>' },
+    { selector: '#histSeg', title: '自动 / 手动记录',
+      body: '<p>历史有两种记法：</p><ul><li><b>自动</b>：输入停顿约 10 秒就自动记，不用按 =（时长在设置里可调）。</li><li><b>手动</b>：按 = 号才记。</li></ul>' },
+    { selector: 'button[data-act="paren"]', title: '智能括号',
+      body: '<p>只用一个 <b>()</b> 键：</p><ul><li>场上没有括号时它是左括号；</li><li>有未闭合时它补右括号；</li><li>括号里算完，运算符自动跳出括号外。</li></ul>' },
+    { selector: '#helpBtn', title: '千分位速读卡',
+      body: '<p>顶部问号里藏着<b>千分位速读</b>练习：单位顺序、三段对应表、读数示例和 Excel 随机公式，看大数字不再数零。</p>' },
+    { selector: '#themeBtn', title: '白天是纸，夜里是墨',
+      body: '<p>最后：右上角太阳/月亮随时切换<b>深浅两套纸感</b>主题。</p><p>引导结束后可以随时点右上角 💡 重新打开。祝算数愉快！</p>' }
+  ];
+  var tour = { idx: 0, open: false, el: {} };
+  ['guideRoot','guideSpot','guideCard','guideStep','guideTitle','guideBody','guideDots','guidePrev','guideNext','guideClose','guideArrow'].forEach(function(id){
+    tour.el[id] = document.getElementById(id);
+  });
+
+  function tourRenderDots(){
+    tour.el.guideDots.innerHTML = tourSteps.map(function(_, i){
+      return '<i class="' + (i === tour.idx ? 'on' : '') + '"></i>';
+    }).join('');
+  }
+
+  function tourPlace(){
+    var step = tourSteps[tour.idx];
+    var spot = tour.el.guideSpot, card = tour.el.guideCard, arrow = tour.el.guideArrow;
+    var rect = null;
+    if(step.selector){
+      var target = document.querySelector(step.selector);
+      if(target && target.offsetParent !== null) rect = target.getBoundingClientRect();
+    }
+    if(!rect){   /* 无目标/目标不可见：聚光隐藏，卡片居中 */
+      spot.style.left = '-9999px'; spot.style.top = '-9999px';
+      spot.style.width = '0px'; spot.style.height = '0px';
+      arrow.style.display = 'none';
+      var cw0 = card.offsetWidth || 340, ch0 = card.offsetHeight || 200;
+      card.style.left = Math.max(12, (window.innerWidth - cw0) / 2) + 'px';
+      card.style.top = Math.max(12, (window.innerHeight - ch0) / 2 - 40) + 'px';
+      return;
+    }
+    arrow.style.display = '';
+    var pad = 8;
+    spot.style.left = (rect.left - pad) + 'px';
+    spot.style.top = (rect.top - pad) + 'px';
+    spot.style.width = (rect.width + pad * 2) + 'px';
+    spot.style.height = (rect.height + pad * 2) + 'px';
+
+    var cardW = card.offsetWidth || 340, cardH = card.offsetHeight || 200, gap = 14;
+    var vw = window.innerWidth, vh = window.innerHeight, place = 'bottom';
+    var left, top;
+    if(rect.bottom + cardH + gap < vh - 12){
+      place = 'bottom';
+      left = rect.left + rect.width / 2 - cardW / 2;
+      top = rect.bottom + gap;
+    } else if(rect.top - cardH - gap > 12){
+      place = 'top';
+      left = rect.left + rect.width / 2 - cardW / 2;
+      top = rect.top - cardH - gap;
+    } else if(rect.right + cardW + gap < vw - 12){
+      place = 'right';
+      left = rect.right + gap;
+      top = rect.top + rect.height / 2 - cardH / 2;
+    } else {
+      place = 'left';
+      left = rect.left - cardW - gap;
+      top = rect.top + rect.height / 2 - cardH / 2;
+    }
+    left = Math.max(12, Math.min(left, vw - cardW - 12));
+    top = Math.max(12, Math.min(top, vh - cardH - 12));
+    card.style.left = left + 'px';
+    card.style.top = top + 'px';
+
+    var cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+    if(place === 'bottom'){ arrow.style.left = Math.max(6, Math.min(cx - left - 6, cardW - 18)) + 'px'; arrow.style.top = '-6px'; arrow.style.bottom = 'auto'; arrow.style.right = 'auto'; }
+    else if(place === 'top'){ arrow.style.left = Math.max(6, Math.min(cx - left - 6, cardW - 18)) + 'px'; arrow.style.bottom = '-6px'; arrow.style.top = 'auto'; arrow.style.right = 'auto'; }
+    else if(place === 'right'){ arrow.style.top = Math.max(6, Math.min(cy - top - 6, cardH - 18)) + 'px'; arrow.style.left = '-6px'; arrow.style.bottom = 'auto'; arrow.style.right = 'auto'; }
+    else { arrow.style.top = Math.max(6, Math.min(cy - top - 6, cardH - 18)) + 'px'; arrow.style.right = '-6px'; arrow.style.top = arrow.style.top; arrow.style.left = 'auto'; arrow.style.bottom = 'auto'; }
+  }
+
+  function tourShow(i){
+    tour.idx = Math.max(0, Math.min(i, tourSteps.length - 1));
+    var step = tourSteps[tour.idx];
+    tour.el.guideStep.textContent = (tour.idx + 1) + ' / ' + tourSteps.length;
+    tour.el.guideTitle.textContent = step.title;
+    tour.el.guideBody.innerHTML = step.body;
+    tour.el.guidePrev.disabled = (tour.idx === 0);
+    tour.el.guideNext.textContent = (tour.idx === tourSteps.length - 1) ? '完成' : '下一步';
+    tourRenderDots();
+    tourPlace();
+    requestAnimationFrame(tourPlace);
+  }
+
+  function tourOpen(){
+    tour.open = true;
+    /* 保证智能括号步骤的目标键在 DOM 可见 */
+    if(state.calcMode === 'sci') setCalcMode('simple');
+    tour.el.guideRoot.classList.add('open');
+    tourShow(0);
+  }
+  function tourClose(){
+    tour.open = false;
+    tour.el.guideRoot.classList.remove('open');
+    if(!state.tourDone){ state.tourDone = true; save(); }
+  }
+
+  document.getElementById('tourBtn').addEventListener('click', tourOpen);
+  tour.el.guideClose.addEventListener('click', tourClose);
+  tour.el.guideRoot.addEventListener('click', function(e){ if(e.target === tour.el.guideRoot) tourClose(); });
+  tour.el.guidePrev.addEventListener('click', function(){ tourShow(tour.idx - 1); });
+  tour.el.guideNext.addEventListener('click', function(){
+    if(tour.idx === tourSteps.length - 1){ tourClose(); return; }
+    tourShow(tour.idx + 1);
   });
 
   /* ---------- init ---------- */
@@ -1927,6 +2108,8 @@
   cacheExprMetrics();
   autoSize();
   render();
+  /* 首次安装自动弹出使用引导（可跳过；tourDone 持久化后不再自动弹） */
+  if(!state.tourDone) tourOpen();
 })();
 </script>
 </body>
