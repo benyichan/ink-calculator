@@ -2013,8 +2013,9 @@
       var target = document.querySelector(step.selector);
       if(target && target.offsetParent !== null) rect = target.getBoundingClientRect();
     }
-    if(!rect){   /* 无目标/目标不可见：聚光隐藏，卡片居中 */
-      spot.style.left = '-9999px'; spot.style.top = '-9999px';
+    if(!rect){   /* 无目标/目标不可见：聚光点收到屏幕中心（阴影均匀盖满全屏），卡片居中 */
+      spot.style.left = (window.innerWidth / 2) + 'px';
+      spot.style.top = (window.innerHeight / 2) + 'px';
       spot.style.width = '0px'; spot.style.height = '0px';
       arrow.style.display = 'none';
       var cw0 = card.offsetWidth || 340, ch0 = card.offsetHeight || 200;
