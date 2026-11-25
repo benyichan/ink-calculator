@@ -680,7 +680,7 @@
           if(typeof out.unit === 'number' && out.unit >= 0 && out.unit <= 6) out.unit = LEGACY_UNIT[out.unit];
           out.unitV = 1;
         }
-        if(typeof out.unit !== 'number' || out.unit < 0 || out.unit > 7) out.unit = 0;
+        if(typeof out.unit !== 'number' || out.unit < 0 || out.unit > 8) out.unit = 0;
         if(typeof out.aggDelay !== 'number' || out.aggDelay < 300 || out.aggDelay > 120000) out.aggDelay = 10000;
         /* 一次性迁移：升级到新默认 10s（用户明确要求） */
         if(out.aggV !== 3){ out.aggDelay = 10000; out.aggV = 3; }
@@ -1136,7 +1136,7 @@
     return count;
   }
 
-  /* 显示单位切换：原值/千/万/十万/百万/千万/亿/十亿 */
+  /* 显示单位切换：原值/千/万/十万/百万/千万/亿/十亿/百分数 */
   var UNITS = [
     {label:'原值', scale:1},
     {label:'千', scale:1e3},
@@ -1145,7 +1145,8 @@
     {label:'百万', scale:1e6},
     {label:'千万', scale:1e7},
     {label:'亿', scale:1e8},
-    {label:'十亿', scale:1e9}
+    {label:'十亿', scale:1e9},
+    {label:'%', scale:0.01}
   ];
   /* 科学计数法：2e-7 / 1.23e21
      sig = 有效数字位数，保留原精度避免信息丢失 */
@@ -1170,12 +1171,13 @@
     }
     return n;
   }
-  /* 零特别多 / 小数位特别长 → 用科学计数法
-     判据：0 总数 > 10、前导零 ≥ 5、小数位 ≥ 8 */
+  /* 零特别多 → 用科学计数法
+     判据：0 总数 > 10、前导零 ≥ 5
+     （小数位长度不作为判据：12 位有效展示的普通小数小数位必然 ≥ 8，
+       误伤 0.12766 这类正常结果——v1.9.1 修复） */
   function tooVerbose(intPart, frac){
     if(countZeros(intPart) + countZeros(frac) > 10) return true;
     if(leadZeros(frac) >= 5) return true;
-    if(frac.length >= 8) return true;
     return false;
   }
 
@@ -1199,8 +1201,8 @@
     if(s.indexOf('.') >= 0) s = s.replace(/(\.\d*?)0+$/,'$1').replace(/\.$/,'');
     var sp = s.split('.');
     var frac = sp[1] || '';
-    /* 前导零 ≥5 或小数位 ≥8 → 科学计数法（0.5 这类正常值不受影响） */
-    if(leadZeros(frac) >= 5 || frac.length >= 8) return toSci(scaled, 4);
+    /* 前导零 ≥5 → 科学计数法（0.5 这类正常值不受影响） */
+    if(leadZeros(frac) >= 5) return toSci(scaled, 4);
     return s;
   }
   /* 换算后小数点后前导零个数（纯十进制展开，不做科学计数） */
@@ -1982,7 +1984,7 @@
     { selector: null, title: '欢迎使用 Ink Calculator',
       body: '<p>这是为认真算数的人设计的<b>墨水屏计算器</b>——无广告、纯本地、完全离线。</p><p>用 30 秒认识几个最顺手的功能，随时可跳过。</p>' },
     { selector: '#unitPicker', title: '显示单位随手切',
-      body: '<p>左上角这里切换结果单位：<b>原值 / 千 / 万 / 十万 / 百万 / 千万 / 亿 / 十亿</b>。</p><ul><li>算完的数立刻按你的单位读。</li><li>历史记录会跟着一起实时换算。</li></ul>' },
+      body: '<p>左上角这里切换结果单位：<b>原值 / 千 / 万 / 十万 / 百万 / 千万 / 亿 / 十亿 / 百分比(%)</b>。</p><ul><li>算完的数立刻按你的单位读，比例结果切 % 直接读百分数。</li><li>历史记录会跟着一起实时换算。</li></ul>' },
     { selector: '#historyBtn', title: '算过的，都留着',
       body: '<p>右上角时钟打开<b>计算历史</b>。</p><ul><li>记录全在本机，不上传。</li><li>点任意条目<b>回填公式</b>，结果按当前单位显示。</li><li>支持多选删除与一键清空。</li></ul>' },
     { selector: '#histSeg', title: '自动 / 手动记录',
