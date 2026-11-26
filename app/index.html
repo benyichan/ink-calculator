@@ -1857,15 +1857,23 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function(){ toastEl.classList.remove('show'); }, 2500);
   }
-  /* 整串复制内容：有对应结果时复制「算式 = 结果」；纯输入态现场求值；
-     结果态用按 = 时的原算式拼结果，避免「结果 = 结果」冗余 */
+  /* 整串复制内容：有对应结果时复制「算式 = 原值结果」；当前单位非原值时
+     追加「（当前单位换算）」括注（如大写档 → （陆仟贰佰捌拾贰元贰角肆分））；
+     纯输入态现场求值；结果态用按 = 时的原算式拼结果，避免「结果 = 结果」冗余 */
   function buildFullCopyText(){
     var expr = exprStr;
+    var unitSuffix = '';
     if(justEvaluated && lastExpr && lastExpr !== exprStr){
-      return { text: lastExpr + ' = ' + exprStr, withResult: true };
+      var base = lastExpr + ' = ' + formatDisplay(resultRaw !== null ? resultRaw : parseFloat(exprStr));
+      if(state.unit !== 0 && resultRaw !== null) base += '（' + formatWithUnit(resultRaw) + '）';
+      return { text: base, withResult: true };
     }
     var r = calculate(expr);
-    if(r.ok) return { text: expr + ' = ' + formatDisplay(r.value), withResult: true };
+    if(r.ok){
+      var base2 = expr + ' = ' + formatDisplay(r.value);
+      if(state.unit !== 0) base2 += '（' + formatWithUnit(r.value) + '）';
+      return { text: base2, withResult: true };
+    }
     return { text: expr, withResult: false };
   }
 
