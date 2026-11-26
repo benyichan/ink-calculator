@@ -8,7 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/协议-MIT-20201e?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/平台-Android%207%2B-20201e?style=flat-square)](https://github.com/benyichan/ink-calculator/releases)
 
-[**🌐 产品介绍落地页**](https://benyichan.github.io/ink-calculator/) · [**📱 下载 APK v1.9.3**](apk/ink-calculator-v1.9.3.apk) · [**🏷 Releases**](https://github.com/benyichan/ink-calculator/releases) · [**▶️ 浏览器在线体验**](https://benyichan.github.io/ink-calculator/app/index.html)
+[**🌐 产品介绍落地页**](https://benyichan.github.io/ink-calculator/) · [**📱 下载 APK v1.10**](apk/ink-calculator-v1.10.apk) · [**🏷 Releases**](https://github.com/benyichan/ink-calculator/releases) · [**▶️ 浏览器在线体验**](https://benyichan.github.io/ink-calculator/app/index.html)
 
 ![screenshot](assets/screenshot.png)
 
@@ -30,14 +30,14 @@
 - **计算历史**：手动（按 `=` 才记录）/ 自动（停顿可配置，默认 10 秒自动记录）双模式，默认保留 30 条，多选删除 + 一键清空
 - **显示单位**：原值 / 千 / 万 / 十万 / 百万 / 千万 / 亿 / 十亿 / 百分比(%) / 人民币大写金额，结果态整体换算，历史记录实时重算
 - **科学模式**：三角函数、对数、幂、开方、阶乘、DEG/RAD、记忆功能
-- **贴心细节**：超长公式自动缩字号完整显示、零过多自动科学计数法、CASIO 式上下文百分号（`100-12.5% = 87.5`）、长按复制「算式 = 结果」整串到剪贴板
+- **贴心细节**：超长公式先缩字号后自动换行完整显示、零过多自动科学计数法、CASIO 式上下文百分号（`100-12.5% = 87.5`）、长按复制「算式 = 结果」整串到剪贴板
 - **千分位速读**：顶部 `?` 内置单位顺序、三段对应表、读数示例和 Excel 随机练习公式，练习时随手可查
 
 ## 下载与体验
 
 | 方式 | 入口 | 说明 |
 |---|---|---|
-| 📱 Android APK | [apk/ink-calculator-v1.9.3.apk](apk/ink-calculator-v1.9.3.apk) · [Releases](https://github.com/benyichan/ink-calculator/releases) | 自签名 release，Android 7.0 / API 24+，首次安装需允许「未知来源」 |
+| 📱 Android APK | [apk/ink-calculator-v1.10.apk](apk/ink-calculator-v1.10.apk) · [Releases](https://github.com/benyichan/ink-calculator/releases) | 自签名 release，Android 7.0 / API 24+，首次安装需允许「未知来源」 |
 | ▶️ 浏览器版 | [在线打开](https://benyichan.github.io/ink-calculator/app/index.html) 或本地 [app/index.html](app/index.html) | 单文件、零依赖、离线可用，与 APK 界面源码完全一致 |
 | 🌐 产品介绍 | [落地页](https://benyichan.github.io/ink-calculator/) |缘起、设计理念、体验演示、为谁而做 |
 

@@ -172,6 +172,11 @@
   }
   #expr *{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
   #expr::-webkit-scrollbar{display:none;}
+  /* 换行模式：字号到下限后自动折行（autoSize 切换 .wrap），纵向滚动防溢出 */
+  #expr.wrap{
+    white-space:normal;word-break:break-all;
+    overflow-x:hidden;overflow-y:auto;max-height:150px;line-height:1.2;
+  }
   #expr .expr-placeholder{color:var(--ink-soft);opacity:.5;}
   #expr .caret{
     display:inline-block;width:0;height:1.05em;border-left:2px solid var(--accent);
@@ -1375,6 +1380,10 @@
     var dCaret = toDispPos(caretPos);
     bSpan.textContent = disp.slice(0, dCaret);
     aSpan.textContent = disp.slice(dCaret);
+    /* 换行模式：光标滚入可视行 */
+    if(exprBox.classList.contains('wrap') && caretSpan.scrollIntoView){
+      try{ caretSpan.scrollIntoView({block:'nearest'}); }catch(e2){}
+    }
   }
 
   /* 复用同一 canvas 做文字测量，避免每次按键/点击新建 2D 上下文 */
@@ -1523,6 +1532,7 @@
     resultEl.classList.remove('error');
   }
 
+  var FS_WRAP_MIN = 20;   /* 字号自适应下限：到 20px 仍放不下 → 换行（字号锁定） */
   function autoSize(){
     var disp = displayText();
     var len = disp.length;
@@ -1535,18 +1545,19 @@
     if(window.innerWidth <= 480 && fs > 38) fs = 38;
     /* 横屏矮屏限制字号，避免撑破显示区 */
     if(window.innerHeight <= 600 && fs > 30) fs = 30;
-    exprBox.style.fontSize = fs + 'px';
-    /* 超长时按真实渲染宽度等比缩小（测量走复用 canvas，度量走缓存，按键路径零强制布局） */
-    if(len > 0){
-      var ctx = measureCtx(exprFontWeight + ' ' + fs + 'px ' + exprFontFamily);
-      var w = ctx.measureText(disp).width;
-      var avail = exprClientW - exprPadL - exprPadR;
-      if(w > avail && w > 0){
-        fs = Math.floor(fs * avail / w);
-        if(fs < 13) fs = 13;
-        exprBox.style.fontSize = fs + 'px';
+    var avail = exprClientW - exprPadL - exprPadR;
+    var wrapMode = false;
+    if(len > 0 && avail > 0){
+      var w = measureCtx(exprFontWeight + ' ' + fs + 'px ' + exprFontFamily).measureText(disp).width;
+      if(w > avail){
+        /* 等比缩字号到下限 FS_WRAP_MIN；到下限仍放不下 → 锁定字号、切换换行模式 */
+        fs = Math.max(FS_WRAP_MIN, Math.floor(fs * avail / w));
+        var wMin = measureCtx(exprFontWeight + ' ' + fs + 'px ' + exprFontFamily).measureText(disp).width;
+        wrapMode = (fs <= FS_WRAP_MIN && wMin > avail);
       }
     }
+    exprBox.classList.toggle('wrap', wrapMode);
+    exprBox.style.fontSize = fs + 'px';
   }
 
   function onUserInput(){
@@ -1929,9 +1940,34 @@
   exprBox.addEventListener('touchcancel', cancelLongPress);
   exprBox.addEventListener('contextmenu', function(e){ e.preventDefault(); });
 
+  /* 显示串片段中的非逗号字符数（含逗号的显示位 → 原始串位） */
+  function dispRawLen(s){
+    var c = 0;
+    for(var i = 0; i < s.length; i++){ if(s[i] !== ',') c++; }
+    return c;
+  }
+
   exprBox.addEventListener('click', function(e){
     if(suppressClick){ suppressClick = false; return; }
     if(justEvaluated && state.unit !== 0 && resultRaw !== null) return; /* 单位态只读 */
+    /* 换行模式：caretRangeFromPoint 多行命中 → 显示位映射回原始位 */
+    if(exprBox.classList.contains('wrap') && document.caretRangeFromPoint){
+      var hit = document.caretRangeFromPoint(e.clientX, e.clientY);
+      if(hit && hit.startContainer){
+        var n = hit.startContainer, off = hit.startOffset;
+        if(n.nodeType === 3 && n.parentNode === bSpan){
+          caretPos = Math.min(dispRawLen(n.textContent.slice(0, off)), exprStr.length);
+        } else if(n.nodeType === 3 && n.parentNode === aSpan){
+          caretPos = Math.min(dispRawLen(bSpan.textContent) + dispRawLen(n.textContent.slice(0, off)), exprStr.length);
+        } else {
+          render();   /* 命中 caret/空白：保持光标不动 */
+          return;
+        }
+        render();
+        return;
+      }
+    }
+    /* 单行模式：宽度累加定位 */
     var rect = exprBox.getBoundingClientRect();
     var dp = posFromX(e.clientX - rect.left);
     caretPos = toRawPos(dp);
