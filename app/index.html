@@ -172,9 +172,11 @@
   }
   #expr *{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;}
   #expr::-webkit-scrollbar{display:none;}
-  /* 换行模式：字号到下限后自动折行（autoSize 切换 .wrap），纵向滚动防溢出 */
+  /* 换行模式：字号到下限后自动折行（autoSize 切换 .wrap），纵向滚动防溢出
+     断点只取运算符边界（render 里以 <wbr> 标注），数字永不拆开；
+     overflow-wrap 兜底无断点的极端长数字 */
   #expr.wrap{
-    white-space:normal;word-break:break-all;
+    white-space:normal;word-break:normal;overflow-wrap:break-word;
     overflow-x:hidden;overflow-y:auto;max-height:150px;line-height:1.2;
   }
   #expr .expr-placeholder{color:var(--ink-soft);opacity:.5;}
@@ -1378,8 +1380,8 @@
       exprBox.appendChild(aSpan);
     }
     var dCaret = toDispPos(caretPos);
-    bSpan.textContent = disp.slice(0, dCaret);
-    aSpan.textContent = disp.slice(dCaret);
+    fillSpansWithBreaks(bSpan, disp.slice(0, dCaret));
+    fillSpansWithBreaks(aSpan, disp.slice(dCaret));
     /* 换行模式：光标滚入可视行 */
     if(exprBox.classList.contains('wrap') && caretSpan.scrollIntoView){
       try{ caretSpan.scrollIntoView({block:'nearest'}); }catch(e2){}
@@ -1946,19 +1948,45 @@
     for(var i = 0; i < s.length; i++){ if(s[i] !== ',') c++; }
     return c;
   }
+  /* span 内、指定 text node 之前的非逗号字符数（wbr 是元素节点不计数） */
+  function dispRawLenBefore(span, node){
+    var c = 0, sib = span.firstChild;
+    while(sib && sib !== node){
+      if(sib.nodeType === 3) c += dispRawLen(sib.textContent);
+      sib = sib.nextSibling;
+    }
+    return c;
+  }
+  /* 分段填充：数字/小数/千分位连块为一个 token（永不在数字内部断行），
+     运算符/括号各为独立 token，每个 token 后插 <wbr> 断行机会点 */
+  function fillSpansWithBreaks(span, text){
+    span.textContent = '';
+    if(!text) return;
+    var re = /[0-9,.]+|[^0-9,.]/g;
+    var m, last = 0, frag = document.createDocumentFragment();
+    while((m = re.exec(text)) !== null){
+      if(m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+      frag.appendChild(document.createTextNode(m[0]));
+      frag.appendChild(document.createElement('wbr'));
+      last = m.index + m[0].length;
+    }
+    if(last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+    span.appendChild(frag);
+  }
 
   exprBox.addEventListener('click', function(e){
     if(suppressClick){ suppressClick = false; return; }
     if(justEvaluated && state.unit !== 0 && resultRaw !== null) return; /* 单位态只读 */
-    /* 换行模式：caretRangeFromPoint 多行命中 → 显示位映射回原始位 */
+    /* 换行模式：caretRangeFromPoint 多行命中 → 显示位映射回原始位
+       （分段渲染后命中点是单个 text node，偏移需加同 span 内前驱 text 的非逗号数） */
     if(exprBox.classList.contains('wrap') && document.caretRangeFromPoint){
       var hit = document.caretRangeFromPoint(e.clientX, e.clientY);
       if(hit && hit.startContainer){
         var n = hit.startContainer, off = hit.startOffset;
         if(n.nodeType === 3 && n.parentNode === bSpan){
-          caretPos = Math.min(dispRawLen(n.textContent.slice(0, off)), exprStr.length);
+          caretPos = Math.min(dispRawLenBefore(bSpan, n) + dispRawLen(n.textContent.slice(0, off)), exprStr.length);
         } else if(n.nodeType === 3 && n.parentNode === aSpan){
-          caretPos = Math.min(dispRawLen(bSpan.textContent) + dispRawLen(n.textContent.slice(0, off)), exprStr.length);
+          caretPos = Math.min(dispRawLenBefore(aSpan, n) + dispRawLen(n.textContent.slice(0, off)) + dispRawLen(bSpan.textContent), exprStr.length);
         } else {
           render();   /* 命中 caret/空白：保持光标不动 */
           return;
